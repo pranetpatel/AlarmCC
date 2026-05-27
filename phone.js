@@ -1,0 +1,206 @@
+/**
+ * phone.js — Vonage SMS + Voice module for AlarmCC
+ *
+ * SMS:   needs only VONAGE_API_KEY + VONAGE_API_SECRET
+ * Voice: same credentials used for NCCO webhooks
+ *        (outbound calls also need VONAGE_APPLICATION_ID + VONAGE_PRIVATE_KEY
+ *         — set these up in the Vonage dashboard under Applications)
+ */
+
+const { Vonage } = require("@vonage/server-sdk");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Client init (lazy so missing env vars don't crash at boot)
+// ─────────────────────────────────────────────────────────────────────────────
+
+let vonage;
+
+function getClient() {
+  if (!vonage) {
+    if (!process.env.VONAGE_API_KEY || !process.env.VONAGE_API_SECRET) {
+      throw new Error("VONAGE_API_KEY and VONAGE_API_SECRET must be set in .env");
+    }
+
+    const opts = {
+      apiKey: process.env.VONAGE_API_KEY,
+      apiSecret: process.env.VONAGE_API_SECRET,
+    };
+
+    // Optional: Application credentials for outbound calls
+    if (process.env.VONAGE_APPLICATION_ID && process.env.VONAGE_PRIVATE_KEY) {
+      opts.applicationId = process.env.VONAGE_APPLICATION_ID;
+      opts.privateKey    = process.env.VONAGE_PRIVATE_KEY;
+    }
+
+    vonage = new Vonage(opts);
+  }
+  return vonage;
+}
+
+function getWebhookBase() {
+  const base = process.env.VONAGE_WEBHOOK_URL || "";
+  if (!base || base.includes("your-ngrok")) {
+    console.warn("[Phone] ⚠️  VONAGE_WEBHOOK_URL is not configured. Voice webhooks won't work.");
+  }
+  return base.replace(/\/$/, ""); // strip trailing slash
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Send an SMS via Vonage.
+ * @param {string} to   Destination phone number (E.164 format, e.g. +14155551234)
+ * @param {string} text Message text
+ */
+async function sendSMS(to, text) {
+  const client = getClient();
+  const from   = process.env.VONAGE_PHONE_NUMBER || "AlarmCC";
+
+  // Vonage SDK v3 returns a promise
+  const resp = await client.sms.send({ to, from, text });
+  const msg  = resp.messages?.[0];
+
+  if (msg?.status !== "0") {
+    const errText = msg?.["error-text"] || "Unknown SMS error";
+    console.error(`[Phone] SMS failed to ${to}: ${errText}`);
+    throw new Error(`SMS failed: ${errText}`);
+  }
+
+  console.log(`[Phone] SMS sent → ${to} | messageId: ${msg["message-id"]}`);
+  return { messageId: msg["message-id"] };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NCCO builders (Vonage Call Control Objects for Voice API)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build the initial NCCO returned when someone calls your Vonage number.
+ * @param {string} callUuid  Vonage call UUID (used so speech results route back)
+ */
+function buildGreetingNcco(callUuid) {
+  const webhookBase = getWebhookBase();
+  return [
+    {
+      action: "talk",
+      text: "Thank you for calling Fire Alarm Support. I'm your AI assistant. Please describe your issue and I'll help you right away.",
+      language: "en-US",
+      style: 1,     // 0=neutral, 1=friendly, 2=newscast
+    },
+    buildInputAction(callUuid, webhookBase),
+  ];
+}
+
+/**
+ * Build the NCCO to speak an AI response and then listen again.
+ * @param {string} text     Text to speak aloud
+ * @param {string} callUuid Vonage call UUID
+ * @param {boolean} end     If true, no follow-up input (ends the call politely)
+ */
+function buildResponseNcco(text, callUuid, end = false) {
+  const webhookBase = getWebhookBase();
+
+  // Strip JSON blocks so the agent doesn't read raw JSON over the phone
+  const spoken = text
+    .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
+    .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
+    .replace(/\*+/g, "")
+    .trim();
+
+  const ncco = [
+    {
+      action: "talk",
+      text: spoken || "I didn't get a response. Please hold.",
+      language: "en-US",
+      style: 1,
+    },
+  ];
+
+  if (!end) {
+    ncco.push(buildInputAction(callUuid, webhookBase));
+  }
+
+  return ncco;
+}
+
+/** Shared input/speech action */
+function buildInputAction(callUuid, webhookBase) {
+  return {
+    action: "input",
+    type: ["speech"],
+    speechSettings: {
+      endOnSilence: 2,      // seconds of silence before sending
+      language: "en-US",
+      sensitivity: 50,       // 0-100, higher = more sensitive
+    },
+    eventUrl: [`${webhookBase}/phone/speech-input`],
+    eventMethod: "POST",
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Outbound voice call
+// (Requires VONAGE_APPLICATION_ID + VONAGE_PRIVATE_KEY in .env)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Initiate an outbound voice call that speaks a message.
+ * @param {string} to      Destination phone number (E.164)
+ * @param {string} message Text to speak when customer answers
+ */
+async function makeVoiceCall(to, message) {
+  if (!process.env.VONAGE_APPLICATION_ID || !process.env.VONAGE_PRIVATE_KEY) {
+    throw new Error(
+      "Outbound voice calls require VONAGE_APPLICATION_ID and VONAGE_PRIVATE_KEY. " +
+        "Create a Vonage Application at https://dashboard.nexmo.com/applications"
+    );
+  }
+
+  const client  = getClient();
+  const from    = process.env.VONAGE_PHONE_NUMBER;
+  const webhookBase = getWebhookBase();
+
+  const ncco = [
+    { action: "talk", text: message, language: "en-US", style: 1 },
+    buildInputAction(null, webhookBase), // allow caller to respond
+  ];
+
+  const resp = await client.voice.createOutboundCall({
+    to:   [{ type: "phone", number: to }],
+    from: { type: "phone", number: from },
+    ncco,
+  });
+
+  console.log(`[Phone] Outbound call initiated → ${to} | uuid: ${resp.uuid}`);
+  return resp;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Detect phrases that indicate the conversation is wrapping up.
+ * Used to decide whether to add another speech-input action.
+ */
+function isCallEnding(agentResponse = "") {
+  const lower = agentResponse.toLowerCase();
+  return (
+    lower.includes("have a great day") ||
+    lower.includes("take care") ||
+    lower.includes("goodbye") ||
+    lower.includes("good bye") ||
+    lower.includes("call us back if") ||
+    lower.includes("issue is resolved")
+  );
+}
+
+module.exports = {
+  sendSMS,
+  makeVoiceCall,
+  buildGreetingNcco,
+  buildResponseNcco,
+  isCallEnding,
+};
