@@ -9,6 +9,20 @@ const { sendSMS, makeVoiceCall, buildGreetingNcco, buildResponseNcco, isCallEndi
 
 dotenv.config();
 
+// ─── Startup key sanity check ────────────────────────────────────────────────
+{
+  const key = process.env.OPENAI_API_KEY || "";
+  if (!key || key.length < 20 || (!key.startsWith("sk-") && !key.startsWith("sk-proj-"))) {
+    console.warn("⚠️  OPENAI_API_KEY looks missing or invalid. Voice/chat AI will return 401.");
+    console.warn("   Get a fresh key at: https://platform.openai.com/api-keys");
+  }
+}
+
+// ─── Completed-call guard (in-memory) ────────────────────────────────────────
+// Tracks UUIDs that have already received a 'completed' event so stale
+// speech-input webhooks arriving after hangup are handled gracefully.
+const completedCallUUIDs = new Set();
+
 const app = express();
 
 // ─── Body parsers ────────────────────────────────────────────────────────────
@@ -489,12 +503,19 @@ app.post("/phone/speech-input", async (req, res) => {
   console.log(`[Phone] 🎙  Speech input for UUID: ${uuid}`);
 
   const customerId   = `phone-${uuid}`;
-  const transcript   = speech?.results?.[0]?.text?.trim();
+  const rawText      = speech?.results?.[0]?.text;
+  const transcript   = rawText && rawText !== "undefined" ? rawText.trim() : "";
   const confidence   = speech?.results?.[0]?.confidence || 0;
 
   console.log(`[Phone] Transcription (${Math.round(confidence * 100)}%): "${transcript}"`);
 
-  // Handle no speech / low confidence
+  // If call already completed, return a silent hangup NCCO — don't reprompt
+  if (completedCallUUIDs.has(uuid)) {
+    console.log(`[Phone] UUID ${uuid} already completed — ignoring stale speech-input`);
+    return res.json([{ action: "talk", text: "", language: "en-US" }]);
+  }
+
+  // Handle no speech / low confidence / "undefined" transcript
   if (!transcript) {
     return res.json([
       {
@@ -543,11 +564,14 @@ app.post("/phone/speech-input", async (req, res) => {
 app.post("/phone/event", async (req, res) => {
   const { uuid, status, duration } = req.body;
 
-  console.log(`[Phone] 📋 Event — UUID: ${uuid} | status: ${status} | duration: ${duration}s`);
+  const durStr = duration != null ? ` | duration: ${duration}s` : "";
+  console.log(`[Phone] 📋 Event — UUID: ${uuid} | status: ${status}${durStr}`);
 
   if (uuid && status) {
+    if (status === "completed") completedCallUUIDs.add(uuid);
+
     const update = { callId: uuid, status };
-    if (duration) update.duration = parseInt(duration, 10);
+    if (duration != null) update.duration = parseInt(duration, 10);
 
     await db.upsertCall(update)
       .catch((e) => console.error("[Phone] Failed to log event:", e.message));

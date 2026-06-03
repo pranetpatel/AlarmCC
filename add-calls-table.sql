@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS calls (
   direction       TEXT         NOT NULL DEFAULT 'inbound'
                                CHECK (direction IN ('inbound','outbound')),
   status          TEXT         NOT NULL DEFAULT 'active'
-                               CHECK (status IN ('active','completed','failed','unanswered')),
+                               CHECK (status IN ('ringing','started','answered','active','completed','failed','unanswered','timeout','rejected','cancelled','busy','machine')),
   duration        INTEGER,
   "recordingUrl"  TEXT,
   "createdAt"     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),

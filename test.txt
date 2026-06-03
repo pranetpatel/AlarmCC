@@ -1,0 +1,7 @@
+
+  "Hi, my fire panel won't stop beeping. It's a Notifier NFS2-3030 at my office.",
+  "The display shows error code star 2, low battery I think.",
+  "I checked the terminals, they're tight. It's been beeping for two days.",
+  "Yes, I'm okay trying the steps you suggest.",
+  "I unplugged the modem for 30 seconds like you said but the panel still shows trouble.",
+  "Okay, schedule a technician for tomorrow morning if that's cheaper."
