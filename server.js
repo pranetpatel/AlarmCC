@@ -600,36 +600,38 @@ app.get("/calls", async (req, res) => {
 // Start
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`\n🔥 Fire Alarm Agent API  →  http://localhost:${PORT}`);
-  console.log(`\n── Web Testing UI ──────────────────────────────────────`);
-  console.log(`   GET  /                     — chat UI (web testing)`);
-  console.log(`   POST /process-call         — send message (web)`);
-  console.log(`   GET  /conversations        — list all conversations`);
-  console.log(`   GET  /conversation/:id     — view conversation`);
-  console.log(`   DELETE /conversation/:id   — delete conversation`);
-  console.log(`\n── Email (Resend) ──────────────────────────────────────`);
-  console.log(`   POST /send-email           — { to, customerId, emailType }`);
-  console.log(`\n── Phone (Vonage) ──────────────────────────────────────`);
-  console.log(`   POST /phone/send-sms       — { phoneNumber, message }`);
-  console.log(`   POST /phone/make-call      — { phoneNumber, message }`);
-  console.log(`   POST /phone/incoming-call  — Vonage answer webhook`);
-  console.log(`   POST /phone/speech-input   — Vonage ASR webhook`);
-  console.log(`   POST /phone/event          — Vonage event webhook`);
-  console.log(`   GET  /calls                — list all call records`);
-  console.log(`\n── Other ───────────────────────────────────────────────`);
-  console.log(`   GET  /health               — service status`);
+// Only bind a port when running directly (local dev). On Vercel the export below is used.
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`\n🔥 Fire Alarm Agent API  →  http://localhost:${PORT}`);
+    console.log(`\n── Web Testing UI ──────────────────────────────────────`);
+    console.log(`   GET  /                     — chat UI (web testing)`);
+    console.log(`   POST /process-call         — send message (web)`);
+    console.log(`   GET  /conversations        — list all conversations`);
+    console.log(`   GET  /conversation/:id     — view conversation`);
+    console.log(`   DELETE /conversation/:id   — delete conversation`);
+    console.log(`\n── Email (Resend) ──────────────────────────────────────`);
+    console.log(`   POST /send-email           — { to, customerId, emailType }`);
+    console.log(`\n── Phone (Vonage) ──────────────────────────────────────`);
+    console.log(`   POST /phone/send-sms       — { phoneNumber, message }`);
+    console.log(`   POST /phone/make-call      — { phoneNumber, message }`);
+    console.log(`   POST /phone/incoming-call  — Vonage answer webhook`);
+    console.log(`   POST /phone/speech-input   — Vonage ASR webhook`);
+    console.log(`   POST /phone/event          — Vonage event webhook`);
+    console.log(`   GET  /calls                — list all call records`);
+    console.log(`\n── Other ───────────────────────────────────────────────`);
+    console.log(`   GET  /health               — service status`);
 
-  // Warn if VONAGE_WEBHOOK_URL isn't set
-  const webhookUrl = process.env.VONAGE_WEBHOOK_URL || "";
-  if (!webhookUrl || webhookUrl.includes("your-ngrok")) {
-    console.log(`\n⚠️  VONAGE_WEBHOOK_URL not set — voice webhooks disabled.`);
-    console.log(`   Run: ngrok http ${PORT}`);
-    console.log(`   Then update VONAGE_WEBHOOK_URL in .env\n`);
-  } else {
-    console.log(`\n✅ Vonage webhook base: ${webhookUrl}\n`);
-  }
-});
+    const webhookUrl = process.env.VONAGE_WEBHOOK_URL || "";
+    if (!webhookUrl || webhookUrl.includes("your-ngrok")) {
+      console.log(`\n⚠️  VONAGE_WEBHOOK_URL not set — voice webhooks disabled.`);
+      console.log(`   Run: ngrok http ${PORT}`);
+      console.log(`   Then update VONAGE_WEBHOOK_URL in .env\n`);
+    } else {
+      console.log(`\n✅ Vonage webhook base: ${webhookUrl}\n`);
+    }
+  });
+}
 
-module.exports = { app };
+module.exports = app;
