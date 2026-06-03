@@ -39,6 +39,10 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // ─────────────────────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are an expert AI phone agent for fire alarm and security system support.
 
+CRITICAL CALL CONTROL RULE:
+When the conversation is fully complete — meaning the issue is resolved, dispatch is confirmed, or the customer says goodbye — you MUST end your response with the exact token [END_CALL] on its own line. Do NOT use [END_CALL] mid-conversation. Only use it once the call is truly over.
+
+
 Your goal is to intelligently triage customer calls, provide troubleshooting, and generate structured dispatch information if a technician is needed.
 
 ================================================================================
@@ -303,11 +307,7 @@ async function processWithAI(customerId, message) {
   const lower = agentResponse.toLowerCase();
   if (lower.includes('"needs_dispatch": true') || lower.includes("technician will visit")) {
     await db.setConversationStatus(customerId, "dispatched");
-  } else if (
-    lower.includes("glad we could resolve") ||
-    lower.includes("issue is resolved") ||
-    lower.includes("have a great day")
-  ) {
+  } else if (agentResponse.includes("[END_CALL]")) {
     await db.setConversationStatus(customerId, "resolved");
   }
 

@@ -102,10 +102,11 @@ function buildGreetingNcco(callUuid) {
 function buildResponseNcco(text, callUuid, end = false) {
   const webhookBase = getWebhookBase();
 
-  // Strip JSON blocks so the agent doesn't read raw JSON over the phone
+  // Strip JSON blocks and the end-of-call token so they're never read aloud
   const spoken = text
     .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
     .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
+    .replace(/\[END_CALL\]/g, "")
     .replace(/\*+/g, "")
     .trim();
 
@@ -182,19 +183,10 @@ async function makeVoiceCall(to, message) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Detect phrases that indicate the conversation is wrapping up.
- * Used to decide whether to add another speech-input action.
+ * Detect whether the AI signalled end-of-call with the explicit [END_CALL] token.
  */
 function isCallEnding(agentResponse = "") {
-  const lower = agentResponse.toLowerCase();
-  return (
-    lower.includes("have a great day") ||
-    lower.includes("take care") ||
-    lower.includes("goodbye") ||
-    lower.includes("good bye") ||
-    lower.includes("call us back if") ||
-    lower.includes("issue is resolved")
-  );
+  return agentResponse.includes("[END_CALL]");
 }
 
 module.exports = {
