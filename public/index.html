@@ -340,7 +340,7 @@
   let isListening = false;
   let isSpeaking = false;
   let recognition = null;
-  let currentUtterance = null;
+  let currentAudio = null;
 
   // ─── Elements ─────────────────────────────────────────────
   const chat        = document.getElementById("chat");
@@ -481,54 +481,59 @@
     }
   });
 
-  // ─── Speech Synthesis (agent speaking) ───────────────────
-  function speak(text) {
-    if (isMuted) return;
-    if (!("speechSynthesis" in window)) return;
-
-    // Cancel previous
-    window.speechSynthesis.cancel();
-
-    // Strip JSON blocks so the agent doesn't read JSON aloud
-    const cleaned = text.replace(/\{[\s\S]*?\}/g, "[dispatch brief generated]");
-
-    const utter = new SpeechSynthesisUtterance(cleaned);
-    utter.rate = 1.05;
-    utter.pitch = 1.0;
-
-    // Prefer a natural English voice
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v =>
-      v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha"))
-    ) || voices.find(v => v.lang.startsWith("en"));
-    if (preferred) utter.voice = preferred;
-
-    utter.onstart = () => {
-      isSpeaking = true;
-      micBtn.classList.add("speaking");
-      micBtn.textContent = "🔊";
-    };
-    utter.onend = utter.onerror = () => {
-      isSpeaking = false;
-      micBtn.classList.remove("speaking");
-      micBtn.textContent = "🎙️";
-    };
-
-    currentUtterance = utter;
-    window.speechSynthesis.speak(utter);
+  // ─── TTS via server (agent speaking) ─────────────────────
+  function stopAudio() {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+    isSpeaking = false;
+    micBtn.classList.remove("speaking");
+    micBtn.textContent = "🎙️";
   }
 
-  // Load voices (Chrome needs this event)
-  if (window.speechSynthesis) {
-    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    window.speechSynthesis.getVoices();
+  async function speak(text) {
+    if (isMuted) return;
+
+    stopAudio();
+    isSpeaking = true;
+    micBtn.classList.add("speaking");
+    micBtn.textContent = "🔊";
+
+    try {
+      const res = await fetch("/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!res.ok) throw new Error("TTS request failed: " + res.status);
+
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+
+      audio.onended = () => { URL.revokeObjectURL(url); stopAudio(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); stopAudio(); };
+
+      audio.play();
+    } catch (err) {
+      console.error("TTS error:", err);
+      stopAudio();
+      // Fallback: device speechSynthesis if server TTS fails
+      if ("speechSynthesis" in window) {
+        const utter = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utter);
+      }
+    }
   }
 
   muteBtn.addEventListener("click", () => {
     isMuted = !isMuted;
     muteBtn.textContent = isMuted ? "🔇 Unmute agent" : "🔊 Mute agent";
     muteBtn.classList.toggle("muted", isMuted);
-    if (isMuted) window.speechSynthesis?.cancel();
+    if (isMuted) { stopAudio(); window.speechSynthesis?.cancel(); }
     showToast(isMuted ? "Agent voice muted" : "Agent voice on");
   });
 
@@ -549,7 +554,7 @@
       micBtn.classList.add("listening");
       micBtn.textContent = "⏹";
       micStatus.textContent = "Listening…";
-      // Stop agent speech so we can hear user
+      stopAudio();
       window.speechSynthesis?.cancel();
     };
 
@@ -589,7 +594,7 @@
     };
 
     micBtn.addEventListener("click", () => {
-      if (isSpeaking) { window.speechSynthesis?.cancel(); return; }
+      if (isSpeaking) { stopAudio(); window.speechSynthesis?.cancel(); return; }
       if (isListening) {
         recognition.stop();
       } else {

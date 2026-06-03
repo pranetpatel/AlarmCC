@@ -40,7 +40,18 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const SYSTEM_PROMPT = `You are an expert AI phone agent for fire alarm and security system support.
 
 CRITICAL CALL CONTROL RULE:
-When the conversation is fully complete — meaning the issue is resolved, dispatch is confirmed, or the customer says goodbye — you MUST end your response with the exact token [END_CALL] on its own line. Do NOT use [END_CALL] mid-conversation. Only use it once the call is truly over.
+Use the exact token [END_CALL] on its own line ONLY when ALL of the following are true:
+  1. The customer has EXPLICITLY said goodbye, "thank you, that's all", "I'm done", or a clear farewell.
+  2. OR the customer has VERBALLY CONFIRMED that their issue is fixed after completing troubleshooting steps.
+  3. OR dispatch has been fully confirmed AND the customer has said they are done with the call.
+
+NEVER use [END_CALL] in these situations (even if you think the issue is clear):
+  - After describing troubleshooting steps (you must wait for the customer to attempt them)
+  - After your first response to a reported problem
+  - After asking a clarifying question
+  - Any time the customer has not yet confirmed resolution or said goodbye
+
+When in doubt, keep the conversation going and ask: "Does that help, or would you like me to walk you through the steps?"
 
 
 Your goal is to intelligently triage customer calls, provide troubleshooting, and generate structured dispatch information if a technician is needed.
@@ -275,32 +286,52 @@ IMPORTANT
 // Shared AI processing — used by BOTH web /process-call AND phone webhooks
 // ─────────────────────────────────────────────────────────────────────────────
 
+const PHONE_MODE_SUFFIX = `\n\nPHONE MODE: Max 2 short sentences (~25 words). One question at a time. Sound like a calm human dispatcher, not a chatbot. No lists, markdown, or JSON in replies. Say "error two" not "*2".`;
+
 /**
  * Run a message through the AI agent for a given customerId.
- * Handles conversation history, persistence, and status detection.
+ * @param {string} customerId
+ * @param {string} message
+ * @param {{ channel?: 'phone' | 'web' }} [opts]
  * @returns {Promise<string>} agentResponse text
  */
-async function processWithAI(customerId, message) {
+async function processWithAI(customerId, message, opts = {}) {
+  const channel = opts.channel || "web";
   const conv = await db.createConversation(customerId);
 
   let history = await db.getFullHistory(customerId);
   let openaiMessages = history ? history.messages : [];
 
   if (openaiMessages.length === 0) {
-    await db.addMessage(conv.id, "system", SYSTEM_PROMPT);
-    openaiMessages = [{ role: "system", content: SYSTEM_PROMPT }];
+    const systemContent = channel === "phone"
+      ? SYSTEM_PROMPT + PHONE_MODE_SUFFIX
+      : SYSTEM_PROMPT;
+    await db.addMessage(conv.id, "system", systemContent);
+    openaiMessages = [{ role: "system", content: systemContent }];
   }
 
   await db.addMessage(conv.id, "user", message);
   openaiMessages.push({ role: "user", content: message });
 
+  const model     = channel === "phone" ? "gpt-4o-mini" : "gpt-4-turbo";
+  const maxTokens = channel === "phone" ? 175 : 1000;
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo",
-    max_tokens: 1000,
+    model,
+    max_tokens: maxTokens,
     messages: openaiMessages,
   });
 
-  const agentResponse = response.choices[0].message.content;
+  let agentResponse = response.choices[0].message.content;
+
+  // Guard: never end the call on the very first user message — the AI hasn't
+  // done any troubleshooting yet. Require at least 2 user turns before honoring [END_CALL].
+  const userTurns = openaiMessages.filter((m) => m.role === "user").length;
+  if (userTurns < 2 && agentResponse.includes("[END_CALL]")) {
+    agentResponse = agentResponse.replace(/\[END_CALL\]/g, "").trim();
+    console.warn("[AI] Stripped premature [END_CALL] on turn", userTurns);
+  }
+
   await db.addMessage(conv.id, "assistant", agentResponse);
 
   // Auto-detect status
@@ -360,6 +391,43 @@ app.post("/process-call", async (req, res) => {
   } catch (error) {
     console.error("OpenAI API error:", error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /tts
+ * Body: { text: string }
+ * Returns audio/mpeg — used by the web UI to avoid device-dependent speechSynthesis.
+ */
+app.post("/tts", async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: "text is required" });
+
+  const cleaned = text
+    .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
+    .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
+    .replace(/\[END_CALL\]/g, "")
+    .replace(/\*(\d+)/g, (_, n) => `error ${n}`)
+    .replace(/[*_]{1,2}([^*_\n]+)[*_]{1,2}/g, "$1")
+    .replace(/\*+/g, "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/^\s*[-•]\s*/gm, "")
+    .trim();
+
+  try {
+    const mp3 = await openai.audio.speech.create({
+      model: "tts-1",
+      voice: "nova",
+      input: cleaned,
+      response_format: "mp3",
+    });
+
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    res.set("Content-Type", "audio/mpeg");
+    res.send(buffer);
+  } catch (err) {
+    console.error("[TTS] Error:", err.message);
+    res.status(500).json({ error: "TTS failed" });
   }
 });
 
@@ -520,14 +588,16 @@ app.post("/phone/speech-input", async (req, res) => {
     return res.json([
       {
         action: "talk",
-        text: "I'm sorry, I didn't catch that. Could you please repeat your question?",
+        text: "<speak>Sorry, I didn't catch that. Could you repeat?</speak>",
         language: "en-US",
-        style: 1,
+        style: 6,
+        premium: true,
+        bargeIn: true,
       },
       {
         action: "input",
         type: ["speech"],
-        speechSettings: { endOnSilence: 2, language: "en-US" },
+        speechSettings: { endOnSilence: 1, language: "en-US" },
         eventUrl: [`${process.env.VONAGE_WEBHOOK_URL}/phone/speech-input`],
         eventMethod: "POST",
       },
@@ -537,7 +607,7 @@ app.post("/phone/speech-input", async (req, res) => {
   // Process with the shared AI function
   let agentResponse;
   try {
-    agentResponse = await processWithAI(customerId, transcript);
+    agentResponse = await processWithAI(customerId, transcript, { channel: "phone" });
   } catch (err) {
     console.error("[Phone] AI error:", err.message);
     agentResponse = "I'm having trouble connecting right now. Please call back in a moment.";

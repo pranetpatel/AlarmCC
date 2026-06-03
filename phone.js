@@ -76,6 +76,55 @@ async function sendSMS(to, text) {
 // NCCO builders (Vonage Call Control Objects for Voice API)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Maps numeric error codes to spoken words for TTS clarity
+const ERROR_CODE_WORDS = {
+  1:'one', 2:'two', 3:'three', 4:'four', 5:'five',
+  6:'six', 7:'seven', 8:'eight', 9:'nine', 10:'ten', 15:'fifteen',
+};
+
+/** Strip markdown/JSON/tokens from text before TTS */
+function cleanSpokenText(raw) {
+  return raw
+    .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
+    .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
+    .replace(/\[END_CALL\]/g, "")
+    .replace(/\*(\d+)/g, (_, n) => {
+      const word = ERROR_CODE_WORDS[parseInt(n)];
+      return word ? `error ${word}` : `error ${n}`;
+    })
+    .replace(/[*_]{1,2}([^*_\n]+)[*_]{1,2}/g, "$1")
+    .replace(/\*+/g, "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/^\s*[-•]\s*/gm, "")
+    .trim();
+}
+
+/**
+ * Limit phone TTS to first 2 sentences or 300 chars, whichever is shorter.
+ * Logs when truncated so we can tune.
+ */
+function capPhoneText(text, maxChars = 300) {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+  const twoSent = sentences.length > 0
+    ? sentences.slice(0, 2).join(" ").trim()
+    : text;
+
+  const result = twoSent.length <= maxChars ? twoSent : twoSent.slice(0, maxChars).trim();
+  if (result.length < text.length) {
+    console.log(`[Phone] TTS truncated: ${text.length} → ${result.length} chars`);
+  }
+  return result || text.slice(0, maxChars);
+}
+
+/** Wrap cleaned text in SSML with sentence-break pauses */
+function toSSML(text) {
+  const sentences = text.match(/[^.!?]+[.!?]+/g);
+  if (!sentences || sentences.length <= 1) {
+    return `<speak>${text}</speak>`;
+  }
+  return `<speak>${sentences.join('<break time="300ms"/>')}</speak>`;
+}
+
 /**
  * Build the initial NCCO returned when someone calls your Vonage number.
  * @param {string} callUuid  Vonage call UUID (used so speech results route back)
@@ -85,9 +134,11 @@ function buildGreetingNcco(callUuid) {
   return [
     {
       action: "talk",
-      text: "Thank you for calling Fire Alarm Support. I'm your AI assistant. Please describe your issue and I'll help you right away.",
+      text: "<speak>Fire Alarm Support. How can I help you today?</speak>",
       language: "en-US",
-      style: 1,     // 0=neutral, 1=friendly, 2=newscast
+      style: 6,
+      premium: true,
+      bargeIn: true,
     },
     buildInputAction(callUuid, webhookBase),
   ];
@@ -102,22 +153,23 @@ function buildGreetingNcco(callUuid) {
 function buildResponseNcco(text, callUuid, end = false) {
   const webhookBase = getWebhookBase();
 
-  // Strip JSON blocks and the end-of-call token so they're never read aloud
-  const spoken = text
-    .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
-    .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
-    .replace(/\[END_CALL\]/g, "")
-    .replace(/\*+/g, "")
-    .trim();
+  const cleaned  = cleanSpokenText(text);
+  const capped   = capPhoneText(cleaned);
+  const ssmlText = toSSML(capped || "I didn't get a response. Please hold.");
 
-  const ncco = [
-    {
-      action: "talk",
-      text: spoken || "I didn't get a response. Please hold.",
-      language: "en-US",
-      style: 1,
-    },
-  ];
+  const talkAction = {
+    action: "talk",
+    text: ssmlText,
+    language: "en-US",
+    style: 6,
+    premium: true,
+  };
+
+  if (!end) {
+    talkAction.bargeIn = true;
+  }
+
+  const ncco = [talkAction];
 
   if (!end) {
     ncco.push(buildInputAction(callUuid, webhookBase));
@@ -132,9 +184,9 @@ function buildInputAction(callUuid, webhookBase) {
     action: "input",
     type: ["speech"],
     speechSettings: {
-      endOnSilence: 2,      // seconds of silence before sending
+      endOnSilence: 1,      // seconds of silence before sending
       language: "en-US",
-      sensitivity: 50,       // 0-100, higher = more sensitive
+      sensitivity: 50,
     },
     eventUrl: [`${webhookBase}/phone/speech-input`],
     eventMethod: "POST",
@@ -164,8 +216,15 @@ async function makeVoiceCall(to, message) {
   const webhookBase = getWebhookBase();
 
   const ncco = [
-    { action: "talk", text: message, language: "en-US", style: 1 },
-    buildInputAction(null, webhookBase), // allow caller to respond
+    {
+      action: "talk",
+      text: toSSML(cleanSpokenText(message)),
+      language: "en-US",
+      style: 6,
+      premium: true,
+      bargeIn: true,
+    },
+    buildInputAction(null, webhookBase),
   ];
 
   const resp = await client.voice.createOutboundCall({
