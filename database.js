@@ -175,6 +175,35 @@ async function setConversationStatus(customerId, status) {
   assertNoError(error, "setConversationStatus");
 }
 
+/**
+ * Mark that a contractor dispatch email was sent for this conversation.
+ * @param {string} customerId
+ */
+async function setContractorEmailSent(customerId) {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ contractorEmailSentAt: new Date().toISOString() })
+    .eq("customerId", customerId);
+
+  assertNoError(error, "setContractorEmailSent");
+}
+
+/**
+ * Fetch a call record by customerId (e.g. phone-{uuid}).
+ * @param {string} customerId
+ */
+async function getCallByCustomerId(customerId) {
+  const { data, error } = await supabase
+    .from("calls")
+    .select("*")
+    .eq("customerId", customerId)
+    .order("createdAt", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  assertNoError(error, "getCallByCustomerId");
+  return data;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Calls (Vonage phone calls)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,7 +267,9 @@ module.exports = {
   getAllConversations,
   deleteConversation,
   setConversationStatus,
+  setContractorEmailSent,
   upsertCall,
   getCall,
+  getCallByCustomerId,
   getAllCalls,
 };

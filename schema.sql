@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   "customerId" TEXT        NOT NULL UNIQUE,
   status       TEXT        NOT NULL DEFAULT 'active'
                            CHECK (status IN ('active','resolved','dispatched')),
+  "contractorEmailSentAt" TIMESTAMPTZ,
   "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

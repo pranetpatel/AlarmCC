@@ -88,6 +88,7 @@ function cleanSpokenText(raw) {
     .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
     .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
     .replace(/\[END_CALL\]/g, "")
+    .replace(/\[DISPATCH_CONFIRMED\]/g, "")
     .replace(/\*(\d+)/g, (_, n) => {
       const word = ERROR_CODE_WORDS[parseInt(n)];
       return word ? `error ${word}` : `error ${n}`;
@@ -137,21 +138,43 @@ function toSSML(text) {
 }
 
 /**
+ * Build a Vonage NCCO talk action.
+ * Premier mode (VONAGE_TTS_VOICE set): uses Google provider + providerOptions, plain text.
+ * Legacy mode (VONAGE_TTS_VOICE unset): uses en-US style 6 premium + SSML.
+ */
+function buildTalkAction(text, opts = {}) {
+  const voiceName = process.env.VONAGE_TTS_VOICE;
+  if (voiceName) {
+    return {
+      action: "talk",
+      text,
+      provider: "google",
+      providerOptions: { name: voiceName, language_code: "en-US" },
+      ...opts,
+    };
+  }
+  return {
+    action: "talk",
+    text,
+    language: "en-US",
+    style: 6,
+    premium: true,
+    ...opts,
+  };
+}
+
+/**
  * Build the initial NCCO returned when someone calls your Vonage number.
  * @param {string} callUuid     Vonage call UUID (used so speech results route back)
  * @param {string} [webhookBase] Public base URL for speech-input webhooks (defaults to env)
  */
 function buildGreetingNcco(callUuid, webhookBase) {
   webhookBase = webhookBase || getWebhookBase();
+  const greetingText = process.env.VONAGE_TTS_VOICE
+    ? "Hey, thanks for calling fire alarm support. What's going on?"
+    : "<speak>Hey, thanks for calling fire alarm support. What's going on?</speak>";
   return [
-    {
-      action: "talk",
-      text: "<speak>Hey, thanks for calling fire alarm support. What's going on?</speak>",
-      language: "en-US",
-      style: 6,
-      premium: true,
-      bargeIn: true,
-    },
+    buildTalkAction(greetingText, { bargeIn: true }),
     buildInputAction(callUuid, webhookBase),
   ];
 }
@@ -166,17 +189,11 @@ function buildGreetingNcco(callUuid, webhookBase) {
 function buildResponseNcco(text, callUuid, end = false, webhookBase) {
   webhookBase = webhookBase || getWebhookBase();
 
-  const cleaned  = cleanSpokenText(text);
-  const capped   = capPhoneText(cleaned);
-  const ssmlText = toSSML(capped || "I didn't get a response. Please hold.");
+  const cleaned = cleanSpokenText(text);
+  const capped  = capPhoneText(cleaned) || "I didn't get a response. Please hold.";
+  const spokenText = process.env.VONAGE_TTS_VOICE ? capped : toSSML(capped);
 
-  const talkAction = {
-    action: "talk",
-    text: ssmlText,
-    language: "en-US",
-    style: 6,
-    premium: true,
-  };
+  const talkAction = buildTalkAction(spokenText);
 
   // Vonage ends the call when the NCCO runs out of actions. Always follow
   // a response with an input action unless we are deliberately hanging up.
@@ -226,15 +243,10 @@ async function makeVoiceCall(to, message) {
   const from    = process.env.VONAGE_PHONE_NUMBER;
   const webhookBase = getWebhookBase();
 
+  const cleaned = cleanSpokenText(message);
+  const spokenText = process.env.VONAGE_TTS_VOICE ? cleaned : toSSML(cleaned);
   const ncco = [
-    {
-      action: "talk",
-      text: toSSML(cleanSpokenText(message)),
-      language: "en-US",
-      style: 6,
-      premium: true,
-      bargeIn: true,
-    },
+    buildTalkAction(spokenText, { bargeIn: true }),
     buildInputAction(null, webhookBase),
   ];
 

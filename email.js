@@ -10,6 +10,23 @@ const { Resend } = require("resend");
 
 let resend;
 
+function getBlockedDomains() {
+  const raw = process.env.RESEND_BLOCKED_DOMAINS || "nssalarms.com,nssalarms";
+  return raw.split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+}
+
+function validateFromAddress(from) {
+  const lower = String(from).toLowerCase();
+  for (const blocked of getBlockedDomains()) {
+    if (lower.includes(blocked)) {
+      throw new Error(
+        `Blocked sender domain "${blocked}" in RESEND_FROM_EMAIL. ` +
+        `Use onboarding@resend.dev for testing instead.`
+      );
+    }
+  }
+}
+
 function getClient() {
   if (!resend) {
     if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.startsWith("re_your_")) {
@@ -20,7 +37,7 @@ function getClient() {
   return resend;
 }
 
-const FROM = process.env.RESEND_FROM_EMAIL || "AlarmCC Support <support@alarmcc.app>";
+const FROM = process.env.RESEND_FROM_EMAIL || "AlarmCC Dispatch <onboarding@resend.dev>";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core send function
@@ -32,6 +49,8 @@ const FROM = process.env.RESEND_FROM_EMAIL || "AlarmCC Support <support@alarmcc.
  * @returns {Promise<{ id: string }>}
  */
 async function sendEmail({ to, subject, html, text }) {
+  validateFromAddress(FROM);
+
   try {
     const client = getClient();
     const { data, error } = await client.emails.send({
@@ -95,6 +114,9 @@ const BADGE_STYLES = {
   resolved:   "background:#e8f5e9;color:#2e7d32",
   dispatched: "background:#fff3e0;color:#e65100",
   critical:   "background:#fce4ec;color:#c62828",
+  high:       "background:#fff3e0;color:#e65100",
+  medium:     "background:#fff8e1;color:#f57f17",
+  low:        "background:#e8f5e9;color:#2e7d32",
 };
 
 function badge(text, type = "active") {
@@ -109,6 +131,13 @@ function row(label, value) {
       <td style="padding:8px 0;color:#666;font-size:14px;width:40%;vertical-align:top">${label}</td>
       <td style="padding:8px 0;font-size:14px;color:#111;font-weight:500">${value}</td>
     </tr>`;
+}
+
+function listItems(items) {
+  if (!items || !items.length) return '<p style="color:#999;font-size:14px;margin:0">None recorded</p>';
+  return `<ul style="margin:0;padding-left:20px;font-size:14px;color:#333;line-height:1.6">
+    ${items.map((i) => `<li>${escHtml(String(i))}</li>`).join("")}
+  </ul>`;
 }
 
 /**
@@ -234,6 +263,96 @@ function confirmationTemplate(conversation) {
   return { subject, html };
 }
 
+/**
+ * templates.contractorDispatch(brief, meta)
+ * On-call contractor dispatch brief — sent when dispatch is confirmed.
+ * @param {object} brief — extracted dispatch JSON
+ * @param {{ customerId: string, callerPhone?: string, timestamp?: string }} meta
+ */
+function contractorDispatchTemplate(brief = {}, meta = {}) {
+  const customer = brief.customer || {};
+  const system = brief.system || {};
+  const issue = brief.issue || {};
+  const dispatch = brief.dispatch_decision || {};
+  const urgency = (dispatch.urgency || "medium").toLowerCase();
+  const dispatchType = brief.dispatch_type || dispatch.dispatch_type || "immediate";
+  const siteLabel = customer.address || customer.name || meta.customerId || "Unknown site";
+
+  const subject = `ON CALL — Fire Alarm Dispatch — ${siteLabel} — ${urgency.toUpperCase()}`;
+
+  const html = `
+    <div style="${BASE_STYLE}">
+      <div style="${CARD_STYLE}">
+        <div style="background:#1a237e;color:#fff;padding:28px 32px">
+          <div style="font-size:22px;font-weight:700">⚡ On-Call Dispatch</div>
+          <div style="margin-top:8px;font-size:14px;opacity:.9">
+            ${badge(urgency.toUpperCase(), urgency)} &nbsp;
+            ${badge(dispatchType === "scheduled" ? "Scheduled" : "Immediate", "dispatched")}
+          </div>
+        </div>
+        <div style="${BODY_STYLE}">
+          ${brief.tech_brief ? `
+          <div style="background:#e8eaf6;border-radius:8px;padding:16px;margin-bottom:24px">
+            <div style="font-size:12px;font-weight:700;color:#1a237e;margin-bottom:6px">TECH BRIEF</div>
+            <p style="font-size:15px;color:#111;margin:0;line-height:1.5">${escHtml(brief.tech_brief)}</p>
+          </div>` : ""}
+
+          <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#111">Site &amp; Contact</div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            ${row("Property", customer.name)}
+            ${row("Address", customer.address)}
+            ${row("Building Type", customer.building_type)}
+            ${row("On-Site Contact", customer.name)}
+            ${row("Contact Phone", customer.phone || meta.callerPhone)}
+            ${row("Caller Phone", meta.callerPhone)}
+          </table>
+
+          <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#111">System</div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            ${row("Type", system.type)}
+            ${row("Brand / Model", system.brand_model)}
+            ${row("System ID", system.system_id_if_known)}
+          </table>
+
+          <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#111">Issue</div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            ${row("Description", issue.customer_description)}
+            ${row("Error Code", issue.detected_error_code)}
+            ${row("Likely Diagnosis", issue.likely_diagnosis)}
+            ${row("Confidence", issue.confidence != null ? `${issue.confidence}%` : "")}
+            ${row("Critical", issue.is_critical ? "YES" : "No")}
+          </table>
+
+          <div style="font-size:15px;font-weight:700;margin-bottom:8px;color:#111">Troubleshooting Already Attempted</div>
+          <p style="font-size:13px;color:#666;margin:0 0 8px">Outcome: <strong>${escHtml(brief.troubleshooting_outcome || "not_attempted")}</strong></p>
+          ${listItems(brief.troubleshooting_attempted)}
+
+          <div style="font-size:15px;font-weight:700;margin:24px 0 12px;color:#111">Technician Prep</div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            ${row("Est. On-Site Time", dispatch.estimated_time_on_site ? `${dispatch.estimated_time_on_site} min` : "")}
+            ${row("Est. Total Cost", dispatch.estimated_total_cost)}
+            ${row("Appointment", brief.appointment_time)}
+          </table>
+          <div style="font-size:13px;font-weight:600;color:#555;margin-bottom:6px">Likely Parts Needed</div>
+          ${listItems(dispatch.parts_likely_needed)}
+
+          ${brief.customer_notes ? `
+          <div style="background:#fff8e1;border-radius:8px;padding:16px;margin-top:16px">
+            <div style="font-size:12px;font-weight:700;color:#f57f17;margin-bottom:6px">ACCESS &amp; NOTES</div>
+            <p style="font-size:14px;color:#333;margin:0">${escHtml(brief.customer_notes)}</p>
+          </div>` : ""}
+        </div>
+        <div style="${FOOTER_STYLE}">
+          Ref: ${escHtml(meta.customerId || "")} &nbsp;|&nbsp;
+          ${new Date(meta.timestamp || Date.now()).toLocaleString()} &nbsp;|&nbsp;
+          AlarmCC Dispatch
+        </div>
+      </div>
+    </div>`;
+
+  return { subject, html };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,5 +379,6 @@ module.exports = {
     callSummary: callSummaryTemplate,
     escalationAlert: escalationAlertTemplate,
     confirmation: confirmationTemplate,
+    contractorDispatch: contractorDispatchTemplate,
   },
 };

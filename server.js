@@ -53,6 +53,13 @@ NEVER use [END_CALL] in these situations (even if you think the issue is clear):
 
 When in doubt, keep the conversation going and ask: "Does that help, or would you like me to walk you through the steps?"
 
+DISPATCH CONFIRMATION TOKEN:
+Use the exact token [DISPATCH_CONFIRMED] on its own line ONLY when ALL of the following are true:
+  1. You have collected site address, system brand/model, symptoms/error code, and troubleshooting attempted.
+  2. You have quoted dispatch pricing and the customer has EXPLICITLY said yes to sending a technician.
+  3. Dispatch type (immediate or scheduled) is agreed upon.
+
+NEVER use [DISPATCH_CONFIRMED] before the customer verbally confirms dispatch.
 
 Your goal is to intelligently triage customer calls, provide troubleshooting, and generate structured dispatch information if a technician is needed.
 
@@ -295,10 +302,141 @@ const PHONE_MODE_SUFFIX = `\n\nPHONE MODE RULES — follow these strictly:
 - No markdown, no bullet points, no JSON, no asterisks.
 - Say "error two" not "*2", "error five" not "*5", etc.
 - If the customer seems stressed, acknowledge it briefly before helping: "Yeah, I get it — let's sort this out."
-- Sound like you've handled this exact problem a hundred times before.`;
+- Sound like you've handled this exact problem a hundred times before.
+
+DISPATCH INTAKE — collect these BEFORE offering dispatch (one question at a time):
+1. Site — business/property name and full address
+2. System — brand and model on the panel (Mircom, Notifier, Edwards, etc.)
+3. Symptom — what is happening right now (beeping, trouble light, offline, false alarm)
+4. Error code — display code if any (say "error three", never use asterisks)
+5. Troubleshooting — what was already tried and the result
+6. Urgency — is monitoring down, active alarm, or nuisance trouble?
+7. On-site contact — name and phone of person at the property
+8. Access — gate codes, panel location, after-hours access notes
+
+Do NOT offer dispatch until items 1-5 are covered (or caller genuinely doesn't know — note that).
+Confirm pricing and dispatch window verbally, then get explicit "yes, send someone" before using [DISPATCH_CONFIRMED].
+When dispatch is confirmed, append [DISPATCH_CONFIRMED] on its own line after your spoken reply.`;
 
 // Minimum user turns before the agent is allowed to end a phone call.
 const MIN_PHONE_TURNS_BEFORE_END = 3;
+
+const EXTRACTION_PROMPT = `You extract structured dispatch data from fire alarm support call transcripts.
+Return ONLY valid JSON matching this schema (use null or empty strings for unknown fields):
+{
+  "customer": { "name": "", "phone": "", "address": "", "building_type": "" },
+  "system": { "type": "", "brand_model": "", "system_id_if_known": "" },
+  "issue": { "customer_description": "", "detected_error_code": "", "likely_diagnosis": "", "confidence": 0, "is_critical": false },
+  "troubleshooting_attempted": [],
+  "troubleshooting_outcome": "success | failed | not_attempted",
+  "dispatch_decision": { "needs_dispatch": true, "urgency": "low|medium|high|critical", "estimated_time_on_site": "", "parts_likely_needed": [], "estimated_total_cost": "" },
+  "tech_brief": "2-3 sentence summary for on-call technician",
+  "customer_notes": "access codes, panel location, on-site contact details",
+  "dispatch_type": "immediate | scheduled",
+  "appointment_time": ""
+}`;
+
+/** Detect whether the agent confirmed a technician dispatch. */
+function isDispatchConfirmed(agentResponse, channel) {
+  if (agentResponse.includes("[DISPATCH_CONFIRMED]")) return true;
+  if (channel === "web") {
+    const lower = agentResponse.toLowerCase();
+    if (lower.includes('"needs_dispatch": true') || lower.includes('"needs_dispatch":true')) return true;
+    const jsonMatch = agentResponse.match(/\{[\s\S]*"needs_dispatch"\s*:\s*true[\s\S]*\}/i);
+    if (jsonMatch) return true;
+  }
+  return false;
+}
+
+/** Build a minimal brief when LLM extraction fails. */
+function fallbackTechBrief(customerId, history) {
+  const msgs = (history?.messages || []).filter((m) => m.role !== "system");
+  const lastUser = msgs.filter((m) => m.role === "user").at(-1);
+  const lastAgent = msgs.filter((m) => m.role === "assistant").at(-1);
+  return {
+    customer: { name: "", phone: "", address: "", building_type: "" },
+    system: { type: "fire_alarm", brand_model: "", system_id_if_known: "" },
+    issue: {
+      customer_description: lastUser?.content || "See transcript",
+      detected_error_code: "",
+      likely_diagnosis: "Dispatch confirmed — review transcript for details",
+      confidence: 0,
+      is_critical: false,
+    },
+    troubleshooting_attempted: [],
+    troubleshooting_outcome: "not_attempted",
+    dispatch_decision: {
+      needs_dispatch: true,
+      urgency: "medium",
+      estimated_time_on_site: "60",
+      parts_likely_needed: [],
+      estimated_total_cost: "",
+    },
+    tech_brief: lastAgent?.content?.replace(/\[DISPATCH_CONFIRMED\]/g, "").replace(/\[END_CALL\]/g, "").trim()
+      || `Dispatch confirmed for ${customerId}. Review full transcript.`,
+    customer_notes: "",
+    dispatch_type: "immediate",
+    appointment_time: "",
+  };
+}
+
+/** Extract structured dispatch brief from conversation transcript. */
+async function extractTechBrief(customerId) {
+  const history = await db.getFullHistory(customerId);
+  if (!history?.messages?.length) return fallbackTechBrief(customerId, history);
+
+  const transcript = history.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => `${m.role === "user" ? "Customer" : "Agent"}: ${m.content}`)
+    .join("\n");
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 800,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: EXTRACTION_PROMPT },
+        { role: "user", content: transcript },
+      ],
+    });
+
+    return JSON.parse(response.choices[0].message.content);
+  } catch (err) {
+    console.error("[Brief] Extraction failed:", err.message);
+    return fallbackTechBrief(customerId, history);
+  }
+}
+
+/** Send on-call contractor dispatch email (deduped per conversation). */
+async function sendContractorDispatchEmail(customerId, { force = false } = {}) {
+  const conv = await db.getConversation(customerId);
+  if (!conv) throw new Error(`Conversation not found: ${customerId}`);
+
+  if (conv.contractorEmailSentAt && !force) {
+    console.log(`[Email] Contractor dispatch already sent for ${customerId}`);
+    return null;
+  }
+
+  const to = process.env.CONTRACTOR_TEST_EMAIL;
+  if (!to || to.includes("your-account-email") || to.includes("example.com")) {
+    throw new Error("CONTRACTOR_TEST_EMAIL is not configured. Set your Resend account email in .env");
+  }
+
+  const brief = await extractTechBrief(customerId);
+  const call = await db.getCallByCustomerId(customerId);
+  const meta = {
+    customerId,
+    callerPhone: call?.phoneNumber || brief.customer?.phone || "Unknown",
+    timestamp: new Date().toISOString(),
+  };
+
+  const template = templates.contractorDispatch(brief, meta);
+  const result = await sendEmail({ to, ...template });
+  await db.setContractorEmailSent(customerId);
+  console.log(`[Email] Contractor dispatch sent for ${customerId} → ${to}`);
+  return result;
+}
 
 /**
  * Run a message through the AI agent for a given customerId.
@@ -345,10 +483,11 @@ async function processWithAI(customerId, message, opts = {}) {
 
   await db.addMessage(conv.id, "assistant", agentResponse);
 
-  // Auto-detect status
-  const lower = agentResponse.toLowerCase();
-  if (lower.includes('"needs_dispatch": true') || lower.includes("technician will visit")) {
+  // Auto-detect status and trigger contractor email on dispatch
+  if (isDispatchConfirmed(agentResponse, channel)) {
     await db.setConversationStatus(customerId, "dispatched");
+    sendContractorDispatchEmail(customerId)
+      .catch((e) => console.error("[Email] Dispatch email failed:", e.message));
   } else if (agentResponse.includes("[END_CALL]")) {
     await db.setConversationStatus(customerId, "resolved");
   }
@@ -382,6 +521,7 @@ app.get("/health", (req, res) => {
     services: {
       openai:  !!process.env.OPENAI_API_KEY,
       resend:  !!(process.env.RESEND_API_KEY && !process.env.RESEND_API_KEY.startsWith("re_your_")),
+      contractorEmail: !!(process.env.CONTRACTOR_TEST_EMAIL && !process.env.CONTRACTOR_TEST_EMAIL.includes("your-account-email")),
       vonage:  !!(process.env.VONAGE_API_KEY && process.env.VONAGE_API_SECRET),
       webhook: !!(process.env.VONAGE_WEBHOOK_URL && !process.env.VONAGE_WEBHOOK_URL.includes("your-ngrok")),
     },
@@ -433,6 +573,7 @@ app.post("/tts", async (req, res) => {
     .replace(/```[\s\S]*?```/g, "A dispatch brief has been generated.")
     .replace(/\{[\s\S]*?\}/g, "Dispatch details have been recorded.")
     .replace(/\[END_CALL\]/g, "")
+    .replace(/\[DISPATCH_CONFIRMED\]/g, "")
     .replace(/\*(\d+)/g, (_, n) => `error ${n}`)
     .replace(/[*_]{1,2}([^*_\n]+)[*_]{1,2}/g, "$1")
     .replace(/\*+/g, "")
@@ -483,16 +624,16 @@ app.delete("/conversation/:customerId", async (req, res) => {
 
 /**
  * POST /send-email
- * Body: { to: string, customerId: string, emailType: "callSummary"|"escalationAlert"|"confirmation" }
+ * Body: { to: string, customerId: string, emailType: "callSummary"|"escalationAlert"|"confirmation"|"contractorDispatch", force?: boolean }
  */
 app.post("/send-email", async (req, res) => {
-  const { to, customerId, emailType = "callSummary" } = req.body;
+  const { to, customerId, emailType = "callSummary", force = false } = req.body;
 
-  if (!to || !customerId) {
-    return res.status(400).json({ error: "to and customerId are required" });
+  if (!customerId) {
+    return res.status(400).json({ error: "customerId is required" });
   }
 
-  const validTypes = ["callSummary", "escalationAlert", "confirmation"];
+  const validTypes = ["callSummary", "escalationAlert", "confirmation", "contractorDispatch"];
   if (!validTypes.includes(emailType)) {
     return res.status(400).json({ error: `emailType must be one of: ${validTypes.join(", ")}` });
   }
@@ -500,6 +641,28 @@ app.post("/send-email", async (req, res) => {
   try {
     const conv = await db.getConversation(customerId);
     if (!conv) return res.status(404).json({ error: "Conversation not found" });
+
+    if (emailType === "contractorDispatch") {
+      const recipient = to || process.env.CONTRACTOR_TEST_EMAIL;
+      if (!recipient) {
+        return res.status(400).json({ error: "to or CONTRACTOR_TEST_EMAIL is required for contractorDispatch" });
+      }
+      const brief = await extractTechBrief(customerId);
+      const call = await db.getCallByCustomerId(customerId);
+      const meta = {
+        customerId,
+        callerPhone: call?.phoneNumber || brief.customer?.phone || "Unknown",
+        timestamp: new Date().toISOString(),
+      };
+      const template = templates.contractorDispatch(brief, meta);
+      const result = await sendEmail({ to: recipient, ...template });
+      if (!force) await db.setContractorEmailSent(customerId);
+      return res.json({ success: true, emailId: result.id, emailType, to: recipient });
+    }
+
+    if (!to) {
+      return res.status(400).json({ error: "to is required" });
+    }
 
     const template = templates[emailType](conv);
     const result = await sendEmail({ to, ...template });
