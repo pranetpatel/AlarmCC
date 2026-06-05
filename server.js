@@ -286,7 +286,16 @@ IMPORTANT
 // Shared AI processing — used by BOTH web /process-call AND phone webhooks
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PHONE_MODE_SUFFIX = `\n\nPHONE MODE: Max 2 short sentences (~25 words). One question at a time. Sound like a calm human dispatcher, not a chatbot. No lists, markdown, or JSON in replies. Say "error two" not "*2".`;
+const PHONE_MODE_SUFFIX = `\n\nPHONE MODE RULES — follow these strictly:
+- You are a real human dispatcher named Alex. Never say you are AI.
+- Talk the way a real person would on the phone: natural, relaxed, direct. Use contractions (don't, I'll, that's, let's).
+- Use natural filler and acknowledgment phrases like "Got it", "Okay", "Sure thing", "Yeah that makes sense", "Alright", "No worries" — but only one per turn, naturally.
+- Max 1-2 short sentences per reply. One question at a time only.
+- Never list steps — say them one at a time as a follow-up.
+- No markdown, no bullet points, no JSON, no asterisks.
+- Say "error two" not "*2", "error five" not "*5", etc.
+- If the customer seems stressed, acknowledge it briefly before helping: "Yeah, I get it — let's sort this out."
+- Sound like you've handled this exact problem a hundred times before.`;
 
 // Minimum user turns before the agent is allowed to end a phone call.
 const MIN_PHONE_TURNS_BEFORE_END = 3;
@@ -317,7 +326,7 @@ async function processWithAI(customerId, message, opts = {}) {
   openaiMessages.push({ role: "user", content: message });
 
   const model     = channel === "phone" ? "gpt-4o-mini" : "gpt-4-turbo";
-  const maxTokens = channel === "phone" ? 175 : 1000;
+  const maxTokens = channel === "phone" ? 90 : 1000;
 
   const response = await openai.chat.completions.create({
     model,
@@ -352,6 +361,14 @@ async function getUserTurnCount(customerId) {
   const history = await db.getFullHistory(customerId);
   if (!history) return 0;
   return history.messages.filter((m) => m.role === "user").length;
+}
+
+/** Derive public webhook base from the incoming request (falls back to env). */
+function getRequestWebhookBase(req) {
+  const proto = req.get("x-forwarded-proto") || req.protocol || "https";
+  const host  = req.get("x-forwarded-host") || req.get("host");
+  if (host) return `${proto}://${host}`.replace(/\/$/, "");
+  return (process.env.VONAGE_WEBHOOK_URL || "").replace(/\/$/, "");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -564,7 +581,10 @@ app.post("/phone/incoming-call", async (req, res) => {
   }).catch((e) => console.error("[Phone] Failed to log call:", e.message));
 
   // Return NCCO — greet caller and wait for speech
-  const ncco = buildGreetingNcco(uuid);
+  const webhookBase = getRequestWebhookBase(req);
+  const ncco = buildGreetingNcco(uuid, webhookBase);
+  const eventUrl = ncco.find((a) => a.action === "input")?.eventUrl?.[0];
+  console.log(`[Phone] Webhook base: ${webhookBase} | speech-input: ${eventUrl}`);
   res.json(ncco);
 });
 
@@ -592,6 +612,8 @@ app.post("/phone/speech-input", async (req, res) => {
     return res.json([{ action: "talk", text: "", language: "en-US" }]);
   }
 
+  const webhookBase = getRequestWebhookBase(req);
+
   // Handle no speech / low confidence / "undefined" transcript
   if (!transcript) {
     const timeoutReason = speech?.timeout_reason || "none";
@@ -599,20 +621,22 @@ app.post("/phone/speech-input", async (req, res) => {
     return res.json(buildResponseNcco(
       "Sorry, I didn't catch that. Could you repeat?",
       uuid,
-      false
+      false,
+      webhookBase
     ));
   }
 
   // Process with the shared AI function
   let agentResponse;
+  let userTurns = 0;
   try {
     agentResponse = await processWithAI(customerId, transcript, { channel: "phone" });
+    userTurns = await getUserTurnCount(customerId);
   } catch (err) {
-    console.error("[Phone] AI error:", err.message);
+    console.error("[Phone] AI/DB error:", err.message);
     agentResponse = "I'm having a brief technical issue. Please tell me again what's happening with your system.";
   }
 
-  const userTurns = await getUserTurnCount(customerId);
   let ending = isCallEnding(agentResponse);
 
   // Vonage hangs up when we return talk without a following input action.
@@ -623,7 +647,7 @@ app.post("/phone/speech-input", async (req, res) => {
     ending = false;
   }
 
-  const ncco = buildResponseNcco(agentResponse, uuid, ending);
+  const ncco = buildResponseNcco(agentResponse, uuid, ending, webhookBase);
   console.log(`[Phone] Turn ${userTurns} | ending=${ending} | NCCO: ${ncco.map((a) => a.action).join(" → ")}`);
 
   // Mark call completed if conversation is ending (non-blocking)

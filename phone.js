@@ -138,14 +138,15 @@ function toSSML(text) {
 
 /**
  * Build the initial NCCO returned when someone calls your Vonage number.
- * @param {string} callUuid  Vonage call UUID (used so speech results route back)
+ * @param {string} callUuid     Vonage call UUID (used so speech results route back)
+ * @param {string} [webhookBase] Public base URL for speech-input webhooks (defaults to env)
  */
-function buildGreetingNcco(callUuid) {
-  const webhookBase = getWebhookBase();
+function buildGreetingNcco(callUuid, webhookBase) {
+  webhookBase = webhookBase || getWebhookBase();
   return [
     {
       action: "talk",
-      text: "<speak>Fire Alarm Support. How can I help you today?</speak>",
+      text: "<speak>Hey, thanks for calling fire alarm support. What's going on?</speak>",
       language: "en-US",
       style: 6,
       premium: true,
@@ -157,12 +158,13 @@ function buildGreetingNcco(callUuid) {
 
 /**
  * Build the NCCO to speak an AI response and then listen again.
- * @param {string} text     Text to speak aloud
- * @param {string} callUuid Vonage call UUID
- * @param {boolean} end     If true, no follow-up input (ends the call politely)
+ * @param {string} text        Text to speak aloud
+ * @param {string} callUuid    Vonage call UUID
+ * @param {boolean} end        If true, no follow-up input (ends the call politely)
+ * @param {string} [webhookBase] Public base URL for speech-input webhooks (defaults to env)
  */
-function buildResponseNcco(text, callUuid, end = false) {
-  const webhookBase = getWebhookBase();
+function buildResponseNcco(text, callUuid, end = false, webhookBase) {
+  webhookBase = webhookBase || getWebhookBase();
 
   const cleaned  = cleanSpokenText(text);
   const capped   = capPhoneText(cleaned);
@@ -191,7 +193,7 @@ function buildInputAction(callUuid, webhookBase) {
     action: "input",
     type: ["speech"],
     speech: {
-      endOnSilence: 2,
+      endOnSilence: 1,
       startTimeout: 15,
       maxDuration: 30,
       language: "en-US",
