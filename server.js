@@ -288,6 +288,9 @@ IMPORTANT
 
 const PHONE_MODE_SUFFIX = `\n\nPHONE MODE: Max 2 short sentences (~25 words). One question at a time. Sound like a calm human dispatcher, not a chatbot. No lists, markdown, or JSON in replies. Say "error two" not "*2".`;
 
+// Minimum user turns before the agent is allowed to end a phone call.
+const MIN_PHONE_TURNS_BEFORE_END = 3;
+
 /**
  * Run a message through the AI agent for a given customerId.
  * @param {string} customerId
@@ -324,10 +327,9 @@ async function processWithAI(customerId, message, opts = {}) {
 
   let agentResponse = response.choices[0].message.content;
 
-  // Guard: never end the call on the very first user message — the AI hasn't
-  // done any troubleshooting yet. Require at least 2 user turns before honoring [END_CALL].
+  // Guard: never end the call too early — the AI must troubleshoot first.
   const userTurns = openaiMessages.filter((m) => m.role === "user").length;
-  if (userTurns < 2 && agentResponse.includes("[END_CALL]")) {
+  if (userTurns < MIN_PHONE_TURNS_BEFORE_END && agentResponse.includes("[END_CALL]")) {
     agentResponse = agentResponse.replace(/\[END_CALL\]/g, "").trim();
     console.warn("[AI] Stripped premature [END_CALL] on turn", userTurns);
   }
@@ -343,6 +345,13 @@ async function processWithAI(customerId, message, opts = {}) {
   }
 
   return agentResponse;
+}
+
+/** Count how many user messages exist for a phone/web customer. */
+async function getUserTurnCount(customerId) {
+  const history = await db.getFullHistory(customerId);
+  if (!history) return 0;
+  return history.messages.filter((m) => m.role === "user").length;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -585,23 +594,13 @@ app.post("/phone/speech-input", async (req, res) => {
 
   // Handle no speech / low confidence / "undefined" transcript
   if (!transcript) {
-    return res.json([
-      {
-        action: "talk",
-        text: "<speak>Sorry, I didn't catch that. Could you repeat?</speak>",
-        language: "en-US",
-        style: 6,
-        premium: true,
-        bargeIn: true,
-      },
-      {
-        action: "input",
-        type: ["speech"],
-        speechSettings: { endOnSilence: 1, language: "en-US" },
-        eventUrl: [`${process.env.VONAGE_WEBHOOK_URL}/phone/speech-input`],
-        eventMethod: "POST",
-      },
-    ]);
+    const timeoutReason = speech?.timeout_reason || "none";
+    console.log(`[Phone] No usable transcript (timeout: ${timeoutReason})`);
+    return res.json(buildResponseNcco(
+      "Sorry, I didn't catch that. Could you repeat?",
+      uuid,
+      false
+    ));
   }
 
   // Process with the shared AI function
@@ -610,15 +609,26 @@ app.post("/phone/speech-input", async (req, res) => {
     agentResponse = await processWithAI(customerId, transcript, { channel: "phone" });
   } catch (err) {
     console.error("[Phone] AI error:", err.message);
-    agentResponse = "I'm having trouble connecting right now. Please call back in a moment.";
+    agentResponse = "I'm having a brief technical issue. Please tell me again what's happening with your system.";
   }
 
-  const ending = isCallEnding(agentResponse);
-  const ncco   = buildResponseNcco(agentResponse, uuid, ending);
+  const userTurns = await getUserTurnCount(customerId);
+  let ending = isCallEnding(agentResponse);
 
-  // Mark call completed if conversation is ending
+  // Vonage hangs up when we return talk without a following input action.
+  // Block premature hangups until the caller has had a real back-and-forth.
+  if (userTurns < MIN_PHONE_TURNS_BEFORE_END && ending) {
+    console.warn(`[Phone] Blocked early hangup on turn ${userTurns} — keeping call open`);
+    agentResponse = agentResponse.replace(/\[END_CALL\]/g, "").trim();
+    ending = false;
+  }
+
+  const ncco = buildResponseNcco(agentResponse, uuid, ending);
+  console.log(`[Phone] Turn ${userTurns} | ending=${ending} | NCCO: ${ncco.map((a) => a.action).join(" → ")}`);
+
+  // Mark call completed if conversation is ending (non-blocking)
   if (ending) {
-    await db.upsertCall({ callId: uuid, status: "completed" })
+    db.upsertCall({ callId: uuid, status: "completed" })
       .catch((e) => console.error("[Phone] Failed to update call status:", e.message));
   }
 

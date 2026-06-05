@@ -4,4 +4,4 @@
   "I checked the terminals, they're tight. It's been beeping for two days.",
   "Yes, I'm okay trying the steps you suggest.",
   "I unplugged the modem for 30 seconds like you said but the panel still shows trouble.",
-  "Okay, schedule a technician for tomorrow morning if that's cheaper."
+  "Okay, schedule a technician for tomorrow morning if that's cheaper.

@@ -116,11 +116,22 @@ function capPhoneText(text, maxChars = 300) {
   return result || text.slice(0, maxChars);
 }
 
+/** Escape characters that break Vonage SSML */
+function escapeSSML(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 /** Wrap cleaned text in SSML with sentence-break pauses */
 function toSSML(text) {
-  const sentences = text.match(/[^.!?]+[.!?]+/g);
+  const safe = escapeSSML(text);
+  const sentences = safe.match(/[^.!?]+[.!?]+/g);
   if (!sentences || sentences.length <= 1) {
-    return `<speak>${text}</speak>`;
+    return `<speak>${safe}</speak>`;
   }
   return `<speak>${sentences.join('<break time="300ms"/>')}</speak>`;
 }
@@ -165,17 +176,13 @@ function buildResponseNcco(text, callUuid, end = false) {
     premium: true,
   };
 
-  if (!end) {
-    talkAction.bargeIn = true;
+  // Vonage ends the call when the NCCO runs out of actions. Always follow
+  // a response with an input action unless we are deliberately hanging up.
+  if (end) {
+    return [talkAction];
   }
 
-  const ncco = [talkAction];
-
-  if (!end) {
-    ncco.push(buildInputAction(callUuid, webhookBase));
-  }
-
-  return ncco;
+  return [talkAction, buildInputAction(callUuid, webhookBase)];
 }
 
 /** Shared input/speech action */
@@ -183,8 +190,10 @@ function buildInputAction(callUuid, webhookBase) {
   return {
     action: "input",
     type: ["speech"],
-    speechSettings: {
-      endOnSilence: 1,      // seconds of silence before sending
+    speech: {
+      endOnSilence: 2,
+      startTimeout: 15,
+      maxDuration: 30,
       language: "en-US",
       sensitivity: 50,
     },
