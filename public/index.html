@@ -19,6 +19,7 @@
       --accent-glow:  rgba(220,58,58,.14);
       --accent2:      #e86060;
       --green:        #38a169;
+      --green-dim:    #2d8055;
       --green-glow:   rgba(56,161,105,.18);
       --text:         #dce0ee;
       --muted:        #636b88;
@@ -30,9 +31,7 @@
       --font:         -apple-system, 'Segoe UI', system-ui, sans-serif;
     }
 
-    html, body {
-      height: 100%;
-    }
+    html, body { height: 100%; }
 
     body {
       background: var(--bg);
@@ -56,10 +55,7 @@
       transition: opacity .3s ease;
     }
 
-    #landing.fade-out {
-      opacity: 0;
-      pointer-events: none;
-    }
+    #landing.fade-out { opacity: 0; pointer-events: none; }
 
     .brand {
       display: flex;
@@ -79,10 +75,7 @@
       color: var(--accent);
     }
 
-    .brand-icon svg {
-      width: 28px;
-      height: 28px;
-    }
+    .brand-icon svg { width: 28px; height: 28px; }
 
     .brand-name {
       font-size: 13px;
@@ -102,7 +95,6 @@
       font-weight: 700;
       line-height: 1.25;
       letter-spacing: -.02em;
-      color: var(--text);
     }
 
     .landing-heading p {
@@ -120,9 +112,7 @@
       max-width: 540px;
     }
 
-    @media (max-width: 440px) {
-      .mode-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 440px) { .mode-grid { grid-template-columns: 1fr; } }
 
     .mode-card {
       background: var(--surface);
@@ -156,15 +146,9 @@
       background: radial-gradient(ellipse at 30% 30%, rgba(56,161,105,.1) 0%, transparent 70%);
     }
 
-    .mode-card:hover {
-      border-color: var(--border2);
-      transform: translateY(-2px);
-    }
-
+    .mode-card:hover { border-color: var(--border2); transform: translateY(-2px); }
     .mode-card:hover::before { opacity: 1; }
-
     .mode-card:active { transform: translateY(0); }
-
     .mode-card.voice:hover { border-color: var(--accent-dim); }
     .mode-card.text:hover  { border-color: #2a6040; }
 
@@ -179,28 +163,11 @@
 
     .card-icon svg { width: 22px; height: 22px; }
 
-    .mode-card.voice .card-icon {
-      background: var(--accent-glow);
-      color: var(--accent2);
-    }
+    .mode-card.voice .card-icon { background: var(--accent-glow); color: var(--accent2); }
+    .mode-card.text  .card-icon { background: var(--green-glow);  color: var(--green); }
 
-    .mode-card.text .card-icon {
-      background: var(--green-glow);
-      color: var(--green);
-    }
-
-    .card-body h3 {
-      font-size: 15px;
-      font-weight: 650;
-      color: var(--text);
-    }
-
-    .card-body p {
-      margin-top: 5px;
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
+    .card-body h3 { font-size: 15px; font-weight: 650; }
+    .card-body p  { margin-top: 5px; font-size: 13px; color: var(--muted); line-height: 1.5; }
 
     .card-cta {
       margin-top: auto;
@@ -213,15 +180,10 @@
 
     .mode-card.voice .card-cta { color: var(--accent2); }
     .mode-card.text  .card-cta { color: var(--green); }
-
     .card-cta svg { width: 14px; height: 14px; transition: transform .18s; }
     .mode-card:hover .card-cta svg { transform: translateX(3px); }
 
-    .landing-note {
-      font-size: 12px;
-      color: var(--subtle);
-      text-align: center;
-    }
+    .landing-note { font-size: 12px; color: var(--subtle); text-align: center; }
 
     /* ═══════════════════════════════════════════════════════
        APP SCREEN
@@ -236,13 +198,8 @@
       transition: opacity .3s ease;
     }
 
-    #app.visible {
-      display: flex;
-    }
-
-    #app.fade-in {
-      opacity: 1;
-    }
+    #app.visible { display: flex; }
+    #app.fade-in { opacity: 1; }
 
     /* Header */
     header {
@@ -323,7 +280,7 @@
       50%      { box-shadow: 0 0 0 5px rgba(56,161,105,.04); }
     }
 
-    /* Session bar */
+    /* Session bar (text mode only) */
     #sessionbar {
       display: flex;
       align-items: center;
@@ -367,10 +324,9 @@
     }
 
     #newSessionBtn:hover { border-color: var(--border2); color: var(--text); }
-
     #newSessionBtn svg { width: 12px; height: 12px; }
 
-    /* Chat */
+    /* Chat (text mode) */
     #chat {
       flex: 1;
       overflow-y: auto;
@@ -385,7 +341,6 @@
     #chat::-webkit-scrollbar-track { background: transparent; }
     #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
-    /* Empty state */
     #welcome {
       margin: auto;
       text-align: center;
@@ -413,12 +368,7 @@
     #welcome p  { font-size: 13.5px; color: var(--muted); max-width: 280px; line-height: 1.55; }
 
     /* Bubbles */
-    .bubble-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 9px;
-    }
-
+    .bubble-row { display: flex; align-items: flex-end; gap: 9px; }
     .bubble-row.user { flex-direction: row-reverse; }
 
     .avatar {
@@ -451,17 +401,9 @@
       border-bottom-left-radius: 4px;
     }
 
-    .bubble.user {
-      background: var(--user-bg);
-      border-bottom-right-radius: 4px;
-    }
+    .bubble.user { background: var(--user-bg); border-bottom-right-radius: 4px; }
 
-    .bubble.typing {
-      display: flex;
-      gap: 5px;
-      align-items: center;
-      padding: 13px 16px;
-    }
+    .bubble.typing { display: flex; gap: 5px; align-items: center; padding: 13px 16px; }
 
     .dot {
       width: 7px;
@@ -479,7 +421,7 @@
       40%          { transform: translateY(-6px); }
     }
 
-    /* Bottom bar */
+    /* Bottom bar (text mode) */
     #bottombar {
       padding: 14px 22px 18px;
       background: var(--surface);
@@ -487,12 +429,7 @@
       flex-shrink: 0;
     }
 
-    /* Text input row */
-    #inputrow {
-      display: flex;
-      gap: 9px;
-      margin-bottom: 12px;
-    }
+    #inputrow { display: flex; gap: 9px; margin-bottom: 12px; }
 
     #textInput {
       flex: 1;
@@ -530,12 +467,7 @@
     #sendBtn:hover { background: var(--accent2); }
     #sendBtn:disabled { opacity: .35; cursor: not-allowed; }
 
-    /* Voice row */
-    #voicerow {
-      display: flex;
-      align-items: center;
-      gap: 13px;
-    }
+    #voicerow { display: flex; align-items: center; gap: 13px; }
 
     #micBtn {
       width: 48px;
@@ -566,20 +498,10 @@
       50%      { box-shadow: 0 0 0 10px rgba(220,58,58,0); }
     }
 
-    #micBtn.speaking {
-      border-color: var(--green);
-      background: var(--green-glow);
-      color: var(--green);
-    }
-
+    #micBtn.speaking { border-color: var(--green); background: var(--green-glow); color: var(--green); }
     #micBtn:disabled { opacity: .3; cursor: not-allowed; }
 
-    #voiceHint {
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-
+    #voiceHint { font-size: 12px; color: var(--muted); line-height: 1.45; }
     #voiceHint strong { color: var(--text); font-size: 12.5px; }
 
     #muteBtn {
@@ -600,6 +522,205 @@
     #muteBtn svg { width: 13px; height: 13px; }
     #muteBtn:hover { border-color: var(--border2); color: var(--text); }
     #muteBtn.muted { color: var(--accent); border-color: rgba(220,58,58,.35); }
+
+    /* ═══════════════════════════════════════════════════════
+       PHONE CALL SCREEN (voice mode)
+    ═══════════════════════════════════════════════════════ */
+
+    #phonecall {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 48px 24px 52px;
+    }
+
+    /* Avatar + rings */
+    .phone-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .phone-rings {
+      position: relative;
+      width: 96px;
+      height: 96px;
+    }
+
+    .phone-ring {
+      position: absolute;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .phone-ring:nth-child(1) { width:  96px; height:  96px; }
+    .phone-ring:nth-child(2) { width: 140px; height: 140px; }
+    .phone-ring:nth-child(3) { width: 184px; height: 184px; }
+
+    /* Listening state: red/accent rings */
+    .phone-rings.listening .phone-ring {
+      border: 1.5px solid var(--accent);
+      animation: ringExpand 1.8s ease-out infinite;
+    }
+
+    .phone-rings.listening .phone-ring:nth-child(2) { animation-delay: .45s; }
+    .phone-rings.listening .phone-ring:nth-child(3) { animation-delay: .9s; }
+
+    /* Speaking state: green rings */
+    .phone-rings.speaking .phone-ring {
+      border: 1.5px solid var(--green);
+      animation: ringExpand 1.8s ease-out infinite;
+    }
+
+    .phone-rings.speaking .phone-ring:nth-child(2) { animation-delay: .45s; }
+    .phone-rings.speaking .phone-ring:nth-child(3) { animation-delay: .9s; }
+
+    @keyframes ringExpand {
+      0%   { opacity: .5; transform: translate(-50%, -50%) scale(.85); }
+      100% { opacity: 0;  transform: translate(-50%, -50%) scale(1.1); }
+    }
+
+    .phone-avatar {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border2);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      z-index: 1;
+      transition: border-color .3s;
+    }
+
+    .phone-rings.listening .phone-avatar { border-color: var(--accent-dim); }
+    .phone-rings.speaking  .phone-avatar { border-color: var(--green-dim); color: var(--green); }
+
+    .phone-avatar svg { width: 34px; height: 34px; }
+
+    .phone-identity {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .phone-name {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      color: var(--text);
+    }
+
+    .phone-service {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .phone-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-height: 42px;
+    }
+
+    #phoneStatus {
+      font-size: 14px;
+      color: var(--muted);
+      transition: color .3s;
+    }
+
+    #phoneStatus.listening { color: var(--accent2); }
+    #phoneStatus.speaking  { color: var(--green); }
+
+    #callTimer {
+      font-size: 13px;
+      color: var(--subtle);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .04em;
+      min-height: 18px;
+    }
+
+    /* Phone controls */
+    .phone-controls {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 44px;
+      width: 100%;
+    }
+
+    .phone-ctrl {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .phone-ctrl span {
+      font-size: 11.5px;
+      color: var(--muted);
+      letter-spacing: .02em;
+    }
+
+    .phone-ctrl button {
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: opacity .15s, background .2s;
+    }
+
+    .phone-ctrl button:active { opacity: .7; }
+
+    /* Side buttons (smaller) */
+    .phone-side-btn {
+      width: 58px;
+      height: 58px;
+      background: var(--surface3);
+      color: var(--text);
+    }
+
+    .phone-side-btn svg { width: 22px; height: 22px; }
+
+    .phone-side-btn.active {
+      background: var(--surface2);
+      color: var(--accent2);
+    }
+
+    /* Main call button (larger) */
+    #callBtn {
+      width: 72px;
+      height: 72px;
+      background: var(--green);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(56,161,105,.3);
+      transition: background .2s, box-shadow .2s;
+    }
+
+    #callBtn svg { width: 28px; height: 28px; }
+
+    #callBtn.in-call {
+      background: var(--accent);
+      box-shadow: 0 4px 20px rgba(220,58,58,.3);
+    }
+
+    #callBtn:hover { opacity: .88; }
 
     /* Toast */
     #toast {
@@ -631,7 +752,6 @@
 
   <div class="brand">
     <div class="brand-icon">
-      <!-- Shield + signal icon -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 2L4 6v6c0 4.8 3.4 9.3 8 10.3 4.6-1 8-5.5 8-10.3V6L12 2z"/>
         <path d="M9 12l2 2 4-4"/>
@@ -649,20 +769,16 @@
 
     <div class="mode-card voice" data-mode="voice">
       <div class="card-icon">
-        <!-- Microphone -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="2" width="6" height="12" rx="3"/>
-          <path d="M5 10a7 7 0 0 0 14 0"/>
-          <line x1="12" y1="19" x2="12" y2="22"/>
-          <line x1="8" y1="22" x2="16" y2="22"/>
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16z"/>
         </svg>
       </div>
       <div class="card-body">
-        <h3>Voice</h3>
-        <p>Use your microphone to speak with the agent as you would over a real call.</p>
+        <h3>Phone Call</h3>
+        <p>Simulate a live phone call with the alarm panel agent using your microphone.</p>
       </div>
       <div class="card-cta">
-        Start with voice
+        Start call
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="5" y1="12" x2="19" y2="12"/>
           <polyline points="13 6 19 12 13 18"/>
@@ -672,7 +788,6 @@
 
     <div class="mode-card text" data-mode="text">
       <div class="card-icon">
-        <!-- Chat bubble -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
         </svg>
@@ -710,7 +825,7 @@
     </div>
     <div class="hdr-text">
       <h1>Alarm Panel AI</h1>
-      <p>Triage · Troubleshoot · Dispatch</p>
+      <p id="hdrSub">Triage · Troubleshoot · Dispatch</p>
     </div>
     <div class="hdr-right">
       <span id="modeBadge" class="mode-badge"></span>
@@ -721,6 +836,7 @@
     </div>
   </header>
 
+  <!-- Text mode: session bar -->
   <div id="sessionbar">
     <label for="callerIdInput">Session</label>
     <input id="callerIdInput" type="text" placeholder="e.g. customer-001" autocomplete="off" />
@@ -732,19 +848,20 @@
     </button>
   </div>
 
+  <!-- Text mode: chat -->
   <div id="chat">
     <div id="welcome">
       <div class="welcome-icon" id="welcomeIcon">
-        <!-- default: panel icon, swapped by mode -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
       </div>
       <h2>Ready for your session</h2>
-      <p id="welcomeHint">Enter a session ID, then type a message or use the mic to begin.</p>
+      <p id="welcomeHint">Enter a session ID, then type a message to begin.</p>
     </div>
   </div>
 
+  <!-- Text mode: input bar -->
   <div id="bottombar">
     <div id="inputrow">
       <textarea id="textInput" placeholder="Describe the issue with your alarm panel…" rows="1"></textarea>
@@ -757,7 +874,6 @@
     </div>
     <div id="voicerow">
       <button id="micBtn" title="Click to toggle mic">
-        <!-- mic icon (default); swapped to stop/speaker dynamically -->
         <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="2" width="6" height="12" rx="3"/>
           <path d="M5 10a7 7 0 0 0 14 0"/>
@@ -780,53 +896,135 @@
     </div>
   </div>
 
+  <!-- Voice mode: phone call screen -->
+  <div id="phonecall">
+
+    <div class="phone-stage">
+      <div class="phone-rings" id="phoneRings">
+        <div class="phone-ring"></div>
+        <div class="phone-ring"></div>
+        <div class="phone-ring"></div>
+        <div class="phone-avatar" id="phoneAvatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L4 6v6c0 4.8 3.4 9.3 8 10.3 4.6-1 8-5.5 8-10.3V6L12 2z"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="phone-identity">
+        <div class="phone-name">Alarm Panel AI</div>
+        <div class="phone-service">Emergency Dispatch Line</div>
+      </div>
+
+      <div class="phone-meta">
+        <div id="phoneStatus">Tap call to connect</div>
+        <div id="callTimer"></div>
+      </div>
+    </div>
+
+    <div class="phone-controls">
+
+      <div class="phone-ctrl">
+        <button class="phone-side-btn" id="phoneMuteBtn" title="Mute microphone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="2" width="6" height="12" rx="3"/>
+            <path d="M5 10a7 7 0 0 0 14 0"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+            <line x1="8" y1="22" x2="16" y2="22"/>
+          </svg>
+        </button>
+        <span>Mute</span>
+      </div>
+
+      <div class="phone-ctrl">
+        <button id="callBtn" title="Start / end call">
+          <!-- phone handset svg -->
+          <svg id="callBtnIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16z"/>
+          </svg>
+        </button>
+        <span id="callBtnLabel">Call</span>
+      </div>
+
+      <div class="phone-ctrl">
+        <button class="phone-side-btn" id="phoneSpeakerBtn" title="Mute agent audio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          </svg>
+        </button>
+        <span id="speakerBtnLabel">Speaker</span>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 
 <div id="toast"></div>
 
 <script>
-  // ── SVG snippets used dynamically ───────────────────────────────────────────
   const SVG = {
     mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>`,
+    micOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>`,
     stop: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`,
     speaker: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`,
     speakerOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`,
+    phoneEnd: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(135deg)"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16z"/></svg>`,
+    phoneStart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.8a16 16 0 0 0 6 6l.94-.94a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 16z"/></svg>`,
     agentAvatar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 4.8 3.4 9.3 8 10.3 4.6-1 8-5.5 8-10.3V6L12 2z"/></svg>`,
     userAvatar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
   };
 
-  // ── State ────────────────────────────────────────────────────────────────────
-  let customerId  = "";
-  let isMuted     = false;
-  let isListening = false;
-  let isSpeaking  = false;
-  let recognition = null;
-  let currentAudio= null;
-  let activeMode  = "text"; // "voice" | "text"
-  let autoRestart = false;  // auto-restart mic after agent finishes speaking
-  let finalBuffer = "";     // accumulated final speech transcript
-  let sendTimer   = null;   // debounce before sending
+  // State
+  let customerId    = "";
+  let isMuted       = false;   // agent TTS muted
+  let isMicMuted    = false;   // phone mode: user mic muted
+  let isListening   = false;
+  let isSpeaking    = false;
+  let recognition   = null;
+  let currentAudio  = null;
+  let activeMode    = "text";
+  let autoRestart   = false;
+  let finalBuffer   = "";
+  let sendTimer     = null;
+  let callActive    = false;
+  let callStartTime = 0;
+  let callTimerInterval = null;
 
-  // ── Elements ─────────────────────────────────────────────────────────────────
-  const landingEl    = document.getElementById("landing");
-  const appEl        = document.getElementById("app");
-  const chat         = document.getElementById("chat");
-  const welcome      = document.getElementById("welcome");
-  const welcomeHint  = document.getElementById("welcomeHint");
-  const welcomeIcon  = document.getElementById("welcomeIcon");
-  const textInput    = document.getElementById("textInput");
-  const sendBtn      = document.getElementById("sendBtn");
-  const micBtn       = document.getElementById("micBtn");
-  const muteBtn      = document.getElementById("muteBtn");
-  const micStatus    = document.getElementById("micStatus");
-  const muteIcon     = document.getElementById("muteIcon");
-  const callerInput  = document.getElementById("callerIdInput");
-  const newSessionBtn= document.getElementById("newSessionBtn");
-  const modeBadge    = document.getElementById("modeBadge");
-  const toast        = document.getElementById("toast");
+  // Elements
+  const landingEl      = document.getElementById("landing");
+  const appEl          = document.getElementById("app");
+  const chat           = document.getElementById("chat");
+  const welcome        = document.getElementById("welcome");
+  const welcomeHint    = document.getElementById("welcomeHint");
+  const welcomeIcon    = document.getElementById("welcomeIcon");
+  const textInput      = document.getElementById("textInput");
+  const sendBtn        = document.getElementById("sendBtn");
+  const micBtn         = document.getElementById("micBtn");
+  const muteBtn        = document.getElementById("muteBtn");
+  const micStatus      = document.getElementById("micStatus");
+  const muteIcon       = document.getElementById("muteIcon");
+  const callerInput    = document.getElementById("callerIdInput");
+  const newSessionBtn  = document.getElementById("newSessionBtn");
+  const modeBadge      = document.getElementById("modeBadge");
+  const sessionbar     = document.getElementById("sessionbar");
+  const bottombar      = document.getElementById("bottombar");
+  const phonecall      = document.getElementById("phonecall");
+  const phoneRings     = document.getElementById("phoneRings");
+  const phoneStatus    = document.getElementById("phoneStatus");
+  const callTimer      = document.getElementById("callTimer");
+  const callBtn        = document.getElementById("callBtn");
+  const callBtnLabel   = document.getElementById("callBtnLabel");
+  const callBtnIcon    = document.getElementById("callBtnIcon");
+  const phoneMuteBtn   = document.getElementById("phoneMuteBtn");
+  const phoneSpeakerBtn= document.getElementById("phoneSpeakerBtn");
+  const speakerBtnLabel= document.getElementById("speakerBtnLabel");
+  const toast          = document.getElementById("toast");
 
-  // ── Landing → App transition ─────────────────────────────────────────────────
-  document.querySelectorAll(".mode-card").forEach((card) => {
+  // Landing → App
+  document.querySelectorAll(".mode-card").forEach(card => {
     card.addEventListener("click", () => {
       activeMode = card.dataset.mode;
       transitionToApp();
@@ -835,15 +1033,11 @@
 
   function transitionToApp() {
     landingEl.classList.add("fade-out");
-
     setTimeout(() => {
       landingEl.style.display = "none";
       appEl.classList.add("visible");
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => appEl.classList.add("fade-in"));
-      });
+      requestAnimationFrame(() => requestAnimationFrame(() => appEl.classList.add("fade-in")));
       applyMode(activeMode);
-      // Auto-generate a session ID
       if (!customerId) {
         customerId = "session-" + Date.now();
         callerInput.value = customerId;
@@ -856,17 +1050,22 @@
     modeBadge.className   = "mode-badge " + mode;
 
     if (mode === "voice") {
-      welcomeHint.textContent = "Enter a session ID, then press the mic to begin speaking.";
-      welcomeIcon.innerHTML = SVG.mic;
+      sessionbar.style.display = "none";
+      chat.style.display       = "none";
+      bottombar.style.display  = "none";
+      phonecall.style.display  = "flex";
+      document.getElementById("hdrSub").textContent = "Emergency Dispatch Line";
     } else {
-      welcomeHint.textContent = "Enter a session ID, then type a message to begin.";
-      welcomeIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+      sessionbar.style.display = "";
+      chat.style.display       = "";
+      bottombar.style.display  = "";
+      phonecall.style.display  = "none";
+      document.getElementById("hdrSub").textContent = "Triage · Troubleshoot · Dispatch";
     }
   }
 
-  // ── Session handling ──────────────────────────────────────────────────────────
+  // Session
   callerInput.addEventListener("change", () => { customerId = callerInput.value.trim(); });
-
   newSessionBtn.addEventListener("click", () => {
     const id = "session-" + Date.now();
     callerInput.value = id;
@@ -875,7 +1074,7 @@
     showToast("New session started");
   });
 
-  // ── Chat helpers ─────────────────────────────────────────────────────────────
+  // Chat helpers
   function clearChat() {
     chat.innerHTML = "";
     chat.appendChild(welcome);
@@ -888,15 +1087,12 @@
     hideWelcome();
     const row = document.createElement("div");
     row.className = "bubble-row " + (role === "user" ? "user" : "agent");
-
     const av = document.createElement("div");
     av.className = "avatar " + (role === "user" ? "user" : "agent");
     av.innerHTML = role === "user" ? SVG.userAvatar : SVG.agentAvatar;
-
     const b = document.createElement("div");
     b.className = "bubble " + (role === "user" ? "user" : "agent");
     b.textContent = text;
-
     row.append(av, b);
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
@@ -908,15 +1104,12 @@
     const row = document.createElement("div");
     row.className = "bubble-row agent";
     row.id = "typingRow";
-
     const av = document.createElement("div");
     av.className = "avatar agent";
     av.innerHTML = SVG.agentAvatar;
-
     const b = document.createElement("div");
     b.className = "bubble agent typing";
     b.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-
     row.append(av, b);
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
@@ -927,14 +1120,53 @@
     if (r) r.remove();
   }
 
-  // ── Toast ─────────────────────────────────────────────────────────────────────
+  // Phone status helpers
+  function setPhoneStatus(text, state) {
+    phoneStatus.textContent = text;
+    phoneStatus.className = state || "";
+    phoneRings.className = "phone-rings" + (state ? " " + state : "");
+  }
+
+  function startCallTimer() {
+    callStartTime = Date.now();
+    callTimerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+      const m = String(Math.floor(elapsed / 60)).padStart(2, "0");
+      const s = String(elapsed % 60).padStart(2, "0");
+      callTimer.textContent = m + ":" + s;
+    }, 1000);
+  }
+
+  function stopCallTimer() {
+    clearInterval(callTimerInterval);
+    callTimerInterval = null;
+    callTimer.textContent = "";
+  }
+
+  function endCall() {
+    callActive    = false;
+    autoRestart   = false;
+    isListening   = false;
+    try { recognition && recognition.stop(); } catch(e) {}
+    stopAudio();
+    stopCallTimer();
+    callBtn.classList.remove("in-call");
+    callBtn.innerHTML  = SVG.phoneStart;
+    callBtnLabel.textContent = "Call";
+    setPhoneStatus("Call ended");
+    setTimeout(() => {
+      if (!callActive) setPhoneStatus("Tap call to connect");
+    }, 3000);
+  }
+
+  // Toast
   function showToast(msg, ms = 2200) {
     toast.textContent = msg;
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), ms);
   }
 
-  // ── Send message ──────────────────────────────────────────────────────────────
+  // Send message
   async function sendMessage(text) {
     text = text.trim();
     if (!text) return;
@@ -944,11 +1176,17 @@
       callerInput.value = customerId;
     }
 
-    addBubble("user", text);
-    textInput.value = "";
-    sendBtn.disabled = true;
-    micBtn.disabled  = true;
-    addTyping();
+    const isVoice = activeMode === "voice";
+
+    if (!isVoice) {
+      addBubble("user", text);
+      textInput.value = "";
+      sendBtn.disabled = true;
+      micBtn.disabled  = true;
+      addTyping();
+    } else {
+      setPhoneStatus("...", "");
+    }
 
     try {
       const res = await fetch("/process-call", {
@@ -957,61 +1195,97 @@
         body: JSON.stringify({ customerId, message: text }),
       });
       const data = await res.json();
-      removeTyping();
+
+      if (!isVoice) removeTyping();
 
       if (data.success) {
         const raw = data.agentResponse;
         const callEnded = raw.includes("[END_CALL]") || raw.includes("[DISPATCH_CONFIRMED]");
         const cleaned = raw.replace(/\[END_CALL\]/g, "").replace(/\[DISPATCH_CONFIRMED\]/g, "").trim();
+
         if (callEnded) {
           autoRestart = false;
-          showToast("Session complete", 3500);
+          if (isVoice) {
+            speak(cleaned, () => endCall());
+          } else {
+            addBubble("agent", cleaned);
+            speak(cleaned);
+            showToast("Session complete", 3500);
+          }
+        } else {
+          if (!isVoice) {
+            addBubble("agent", cleaned);
+          }
+          speak(cleaned);
         }
-        addBubble("agent", cleaned);
-        speak(cleaned);
       } else {
-        addBubble("agent", "Error: " + (data.error || "Unknown error"));
+        if (!isVoice) {
+          addBubble("agent", "Error: " + (data.error || "Unknown error"));
+        } else {
+          setPhoneStatus("Something went wrong");
+          maybeAutoRestart();
+        }
       }
     } catch {
-      removeTyping();
-      addBubble("agent", "Could not reach the server. Please check that it is running.");
+      if (!isVoice) {
+        removeTyping();
+        addBubble("agent", "Could not reach the server. Please check that it is running.");
+      } else {
+        setPhoneStatus("Connection error");
+        maybeAutoRestart();
+      }
     } finally {
-      sendBtn.disabled = false;
-      micBtn.disabled  = false;
+      if (!isVoice) {
+        sendBtn.disabled = false;
+        micBtn.disabled  = false;
+      }
     }
   }
 
-  // ── Text input handling ────────────────────────────────────────────────────────
+  // Text input
   sendBtn.addEventListener("click", () => sendMessage(textInput.value));
-  textInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(textInput.value);
-    }
+  textInput.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(textInput.value); }
   });
 
-  // ── TTS (agent speaking) ──────────────────────────────────────────────────────
+  // TTS
   function stopAudio() {
     if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     isSpeaking = false;
     micBtn.classList.remove("speaking");
     micBtn.innerHTML = SVG.mic;
+    if (activeMode === "voice" && callActive) setPhoneStatus("Listening...", "listening");
   }
 
   function maybeAutoRestart() {
-    if (autoRestart && activeMode === "voice" && !isMuted && !isListening) {
-      textInput.value = "";
-      micStatus.textContent = "Listening…";
+    if (autoRestart && !isMicMuted && !isListening) {
+      finalBuffer = "";
+      if (activeMode === "voice") setPhoneStatus("Listening...", "listening");
+      else { textInput.value = ""; micStatus.textContent = "Listening…"; }
       setTimeout(() => { try { recognition.start(); } catch(e) {} }, 150);
     }
   }
 
-  async function speak(text) {
-    if (isMuted) { maybeAutoRestart(); return; }
+  async function speak(text, onDone) {
+    if (isMuted) {
+      if (onDone) onDone();
+      else maybeAutoRestart();
+      return;
+    }
     stopAudio();
     isSpeaking = true;
-    micBtn.classList.add("speaking");
-    micBtn.innerHTML = SVG.speaker;
+    if (activeMode === "voice" && callActive) {
+      setPhoneStatus("Speaking...", "speaking");
+    } else {
+      micBtn.classList.add("speaking");
+      micBtn.innerHTML = SVG.speaker;
+    }
+
+    const finish = () => {
+      stopAudio();
+      if (onDone) onDone();
+      else maybeAutoRestart();
+    };
 
     try {
       const res = await fetch("/tts", {
@@ -1024,22 +1298,23 @@
       const url   = URL.createObjectURL(blob);
       const audio = new Audio(url);
       currentAudio = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); stopAudio(); maybeAutoRestart(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); stopAudio(); maybeAutoRestart(); };
+      audio.onended = () => { URL.revokeObjectURL(url); finish(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
       audio.play();
     } catch (err) {
       console.error("TTS error:", err);
-      stopAudio();
+      isSpeaking = false;
       if ("speechSynthesis" in window) {
         const u = new SpeechSynthesisUtterance(text);
-        u.onend = () => maybeAutoRestart();
+        u.onend = finish;
         window.speechSynthesis.speak(u);
       } else {
-        maybeAutoRestart();
+        finish();
       }
     }
   }
 
+  // Text-mode mute button
   muteBtn.addEventListener("click", () => {
     isMuted = !isMuted;
     muteBtn.innerHTML = (isMuted ? SVG.speakerOff : SVG.speaker) + (isMuted ? " Unmute agent" : " Mute agent");
@@ -1048,37 +1323,85 @@
     showToast(isMuted ? "Agent voice muted" : "Agent voice on");
   });
 
-  // ── Speech recognition (user speaking) ────────────────────────────────────────
+  // Phone mode: speaker (agent TTS mute)
+  phoneSpeakerBtn.addEventListener("click", () => {
+    isMuted = !isMuted;
+    phoneSpeakerBtn.innerHTML = isMuted ? SVG.speakerOff : SVG.speaker;
+    phoneSpeakerBtn.classList.toggle("active", isMuted);
+    speakerBtnLabel.textContent = isMuted ? "Muted" : "Speaker";
+    if (isMuted) { stopAudio(); window.speechSynthesis?.cancel(); }
+  });
+
+  // Phone mode: mute own mic
+  phoneMuteBtn.addEventListener("click", () => {
+    if (!callActive) return;
+    isMicMuted = !isMicMuted;
+    phoneMuteBtn.innerHTML = isMicMuted ? SVG.micOff : SVG.mic;
+    phoneMuteBtn.classList.toggle("active", isMicMuted);
+    if (isMicMuted) {
+      autoRestart = false;
+      try { recognition && recognition.stop(); } catch(e) {}
+      setPhoneStatus("Muted", "");
+    } else {
+      autoRestart = true;
+      maybeAutoRestart();
+    }
+  });
+
+  // Phone mode: call button
+  callBtn.addEventListener("click", () => {
+    if (!callActive) {
+      callActive  = true;
+      autoRestart = true;
+      isMicMuted  = false;
+      callBtn.classList.add("in-call");
+      callBtn.innerHTML = SVG.phoneEnd;
+      callBtnLabel.textContent = "End";
+      setPhoneStatus("Listening...", "listening");
+      startCallTimer();
+      finalBuffer = "";
+      try { recognition.start(); } catch(e) {}
+    } else {
+      endCall();
+    }
+  });
+
+  // Speech recognition
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   if (!SpeechRec) {
     micBtn.disabled = true;
     micStatus.textContent = "Voice input not supported — use Chrome";
+    setPhoneStatus("Voice not supported — use Chrome");
   } else {
     recognition = new SpeechRec();
-    recognition.continuous    = true;  // keep listening through pauses
-    recognition.interimResults= true;
-    recognition.lang          = "en-US";
+    recognition.continuous     = true;
+    recognition.interimResults = true;
+    recognition.lang           = "en-US";
 
     recognition.onstart = () => {
       isListening = true;
       finalBuffer = "";
-      micBtn.classList.add("listening");
-      micBtn.innerHTML = SVG.stop;
-      micStatus.textContent = "Listening…";
+      if (activeMode === "voice") {
+        setPhoneStatus("Listening...", "listening");
+      } else {
+        micBtn.classList.add("listening");
+        micBtn.innerHTML = SVG.stop;
+        micStatus.textContent = "Listening…";
+      }
       stopAudio();
       window.speechSynthesis?.cancel();
     };
 
-    recognition.onresult = (e) => {
+    recognition.onresult = e => {
       let interim = "";
       for (const r of e.results) {
         if (r.isFinal) finalBuffer += r[0].transcript + " ";
         else interim += r[0].transcript;
       }
-      textInput.value = finalBuffer + interim;
-
-      // Reset the send timer each time new final speech arrives
+      if (activeMode !== "voice") {
+        textInput.value = finalBuffer + interim;
+      }
       if (finalBuffer) {
         clearTimeout(sendTimer);
         sendTimer = setTimeout(() => recognition.stop(), 1500);
@@ -1089,31 +1412,41 @@
       isListening = false;
       clearTimeout(sendTimer);
       sendTimer = null;
-      micBtn.classList.remove("listening");
-      micBtn.innerHTML = SVG.mic;
-      micStatus.textContent = "Click mic to start listening";
-      const transcript = (finalBuffer || textInput.value).trim();
+      if (activeMode !== "voice") {
+        micBtn.classList.remove("listening");
+        micBtn.innerHTML = SVG.mic;
+        micStatus.textContent = "Click mic to start listening";
+      }
+      const transcript = (finalBuffer || (activeMode !== "voice" ? textInput.value : "")).trim();
       finalBuffer = "";
       if (transcript) sendMessage(transcript);
     };
 
-    recognition.onerror = (e) => {
+    recognition.onerror = e => {
       isListening = false;
       clearTimeout(sendTimer);
       sendTimer = null;
       finalBuffer = "";
-      micBtn.classList.remove("listening");
-      micBtn.innerHTML = SVG.mic;
+      if (activeMode !== "voice") {
+        micBtn.classList.remove("listening");
+        micBtn.innerHTML = SVG.mic;
+      }
       if (e.error === "not-allowed") {
-        micStatus.textContent = "Microphone access denied";
+        if (activeMode === "voice") setPhoneStatus("Microphone access denied");
+        else micStatus.textContent = "Microphone access denied";
         showToast("Allow microphone access in your browser");
       } else if (e.error !== "no-speech") {
-        micStatus.textContent = "Voice error: " + e.error;
-      } else {
+        if (activeMode === "voice") setPhoneStatus("Audio error: " + e.error);
+        else micStatus.textContent = "Voice error: " + e.error;
+      } else if (activeMode !== "voice") {
         micStatus.textContent = "Click mic to start listening";
+      }
+      if (activeMode === "voice" && callActive && e.error === "no-speech") {
+        maybeAutoRestart();
       }
     };
 
+    // Text-mode mic button
     micBtn.addEventListener("click", () => {
       if (isSpeaking) { stopAudio(); window.speechSynthesis?.cancel(); return; }
       if (isListening) {
