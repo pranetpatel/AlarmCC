@@ -167,8 +167,8 @@ function buildTalkAction(text, opts = {}) {
 function buildGreetingNcco(callUuid, webhookBase) {
   webhookBase = webhookBase || getWebhookBase();
   const greetingText = process.env.VONAGE_TTS_VOICE
-    ? "Hey, thanks for calling fire alarm support. What's going on?"
-    : "<speak>Hey, thanks for calling fire alarm support. What's going on?</speak>";
+    ? "Hey, this is Alex with alarm panel support. What's going on with your system?"
+    : "<speak>Hey, this is Alex with alarm panel support. What's going on with your system?</speak>";
   return [
     buildTalkAction(greetingText, { bargeIn: true }),
     buildInputAction(callUuid, webhookBase),

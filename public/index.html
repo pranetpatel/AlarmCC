@@ -3,166 +3,485 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fire Alarm AI Agent</title>
+  <title>Alarm Panel AI</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface2: #22263a;
-      --border: #2e3350;
-      --accent: #ff4c2b;
-      --accent2: #ff7b5e;
-      --text: #e8eaf0;
-      --muted: #7a80a0;
-      --user-bubble: #1e3a5f;
-      --agent-bubble: #1e2b1a;
-      --agent-border: #2d4a28;
-      --radius: 14px;
-      --font: 'Segoe UI', system-ui, sans-serif;
+      --bg:           #090c13;
+      --surface:      #0f1320;
+      --surface2:     #161b2c;
+      --surface3:     #1d2338;
+      --border:       #232a3e;
+      --border2:      #2c3450;
+      --accent:       #dc3a3a;
+      --accent-dim:   #b82e2e;
+      --accent-glow:  rgba(220,58,58,.14);
+      --accent2:      #e86060;
+      --green:        #38a169;
+      --green-glow:   rgba(56,161,105,.18);
+      --text:         #dce0ee;
+      --muted:        #636b88;
+      --subtle:       #3a4060;
+      --user-bg:      #1a3154;
+      --agent-bg:     #111a0f;
+      --agent-border: #1e3018;
+      --radius:       12px;
+      --font:         -apple-system, 'Segoe UI', system-ui, sans-serif;
+    }
+
+    html, body {
+      height: 100%;
     }
 
     body {
       background: var(--bg);
       color: var(--text);
       font-family: var(--font);
-      height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       LANDING SCREEN
+    ═══════════════════════════════════════════════════════ */
+
+    #landing {
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px 60px;
+      gap: 48px;
+      transition: opacity .3s ease;
+    }
+
+    #landing.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+    }
+
+    .brand-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .brand-name {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .landing-heading {
+      text-align: center;
+      max-width: 480px;
+    }
+
+    .landing-heading h1 {
+      font-size: clamp(22px, 4vw, 32px);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -.02em;
+      color: var(--text);
+    }
+
+    .landing-heading p {
+      margin-top: 10px;
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    @media (max-width: 440px) {
+      .mode-grid { grid-template-columns: 1fr; }
+    }
+
+    .mode-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px;
+      cursor: pointer;
+      transition: border-color .18s, background .18s, transform .18s;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+      position: relative;
       overflow: hidden;
     }
 
-    /* ── Header ── */
+    .mode-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity .18s;
+      pointer-events: none;
+    }
+
+    .mode-card.voice::before {
+      background: radial-gradient(ellipse at 30% 30%, var(--accent-glow) 0%, transparent 70%);
+    }
+
+    .mode-card.text::before {
+      background: radial-gradient(ellipse at 30% 30%, rgba(56,161,105,.1) 0%, transparent 70%);
+    }
+
+    .mode-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+
+    .mode-card:hover::before { opacity: 1; }
+
+    .mode-card:active { transform: translateY(0); }
+
+    .mode-card.voice:hover { border-color: var(--accent-dim); }
+    .mode-card.text:hover  { border-color: #2a6040; }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+
+    .card-icon svg { width: 22px; height: 22px; }
+
+    .mode-card.voice .card-icon {
+      background: var(--accent-glow);
+      color: var(--accent2);
+    }
+
+    .mode-card.text .card-icon {
+      background: var(--green-glow);
+      color: var(--green);
+    }
+
+    .card-body h3 {
+      font-size: 15px;
+      font-weight: 650;
+      color: var(--text);
+    }
+
+    .card-body p {
+      margin-top: 5px;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .card-cta {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .mode-card.voice .card-cta { color: var(--accent2); }
+    .mode-card.text  .card-cta { color: var(--green); }
+
+    .card-cta svg { width: 14px; height: 14px; transition: transform .18s; }
+    .mode-card:hover .card-cta svg { transform: translateX(3px); }
+
+    .landing-note {
+      font-size: 12px;
+      color: var(--subtle);
+      text-align: center;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       APP SCREEN
+    ═══════════════════════════════════════════════════════ */
+
+    #app {
+      display: none;
+      height: 100dvh;
+      flex-direction: column;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity .3s ease;
+    }
+
+    #app.visible {
+      display: flex;
+    }
+
+    #app.fade-in {
+      opacity: 1;
+    }
+
+    /* Header */
     header {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 16px 24px;
+      padding: 14px 22px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
-    .logo {
-      width: 36px; height: 36px;
-      background: var(--accent);
+
+    .hdr-logo {
+      width: 34px;
+      height: 34px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
       border-radius: 10px;
-      display: grid; place-items: center;
-      font-size: 20px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      flex-shrink: 0;
     }
-    .header-text h1 { font-size: 17px; font-weight: 700; }
-    .header-text p  { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+    .hdr-logo svg { width: 17px; height: 17px; }
+
+    .hdr-text h1 { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+    .hdr-text p  { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+    .hdr-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mode-badge {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 20px;
+      border: 1px solid;
+    }
+
+    .mode-badge.voice {
+      color: var(--accent2);
+      border-color: rgba(220,58,58,.35);
+      background: rgba(220,58,58,.07);
+    }
+
+    .mode-badge.text {
+      color: var(--green);
+      border-color: rgba(56,161,105,.35);
+      background: rgba(56,161,105,.07);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
 
     .status-dot {
-      width: 9px; height: 9px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: #4caf50;
-      margin-left: auto;
-      box-shadow: 0 0 0 3px rgba(76,175,80,.2);
-      animation: pulse 2s infinite;
-    }
-    @keyframes pulse {
-      0%,100% { box-shadow: 0 0 0 3px rgba(76,175,80,.2); }
-      50%      { box-shadow: 0 0 0 6px rgba(76,175,80,.05); }
+      background: var(--green);
+      box-shadow: 0 0 0 2px rgba(56,161,105,.2);
+      animation: pulse 2.5s infinite;
     }
 
-    /* ── Call ID bar ── */
-    #callbar {
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 2px rgba(56,161,105,.2); }
+      50%      { box-shadow: 0 0 0 5px rgba(56,161,105,.04); }
+    }
+
+    /* Session bar */
+    #sessionbar {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 24px;
+      padding: 9px 22px;
       background: var(--surface2);
       border-bottom: 1px solid var(--border);
-      font-size: 13px;
+      font-size: 12.5px;
       flex-shrink: 0;
     }
-    #callbar label { color: var(--muted); }
-    #callbar input {
+
+    #sessionbar label { color: var(--muted); font-size: 12px; }
+
+    #sessionbar input {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
-      border-radius: 8px;
-      padding: 5px 10px;
-      font-size: 13px;
-      width: 180px;
+      border-radius: 7px;
+      padding: 4px 10px;
+      font-size: 12.5px;
+      width: 170px;
       outline: none;
+      font-family: var(--font);
     }
-    #callbar input:focus { border-color: var(--accent); }
-    #newCallBtn {
+
+    #sessionbar input:focus { border-color: var(--accent); }
+
+    #newSessionBtn {
       margin-left: auto;
       background: transparent;
       border: 1px solid var(--border);
       color: var(--muted);
-      border-radius: 8px;
-      padding: 5px 12px;
+      border-radius: 7px;
+      padding: 4px 11px;
       font-size: 12px;
       cursor: pointer;
       transition: .15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
-    #newCallBtn:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Chat area ── */
+    #newSessionBtn:hover { border-color: var(--border2); color: var(--text); }
+
+    #newSessionBtn svg { width: 12px; height: 12px; }
+
+    /* Chat */
     #chat {
       flex: 1;
       overflow-y: auto;
-      padding: 24px;
+      padding: 24px 22px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
       scroll-behavior: smooth;
     }
-    #chat::-webkit-scrollbar { width: 5px; }
+
+    #chat::-webkit-scrollbar { width: 4px; }
     #chat::-webkit-scrollbar-track { background: transparent; }
     #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
+    /* Empty state */
+    #welcome {
+      margin: auto;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .welcome-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .welcome-icon svg { width: 24px; height: 24px; }
+
+    #welcome h2 { font-size: 17px; font-weight: 650; }
+    #welcome p  { font-size: 13.5px; color: var(--muted); max-width: 280px; line-height: 1.55; }
+
+    /* Bubbles */
     .bubble-row {
       display: flex;
       align-items: flex-end;
-      gap: 10px;
+      gap: 9px;
     }
-    .bubble-row.user  { flex-direction: row-reverse; }
+
+    .bubble-row.user { flex-direction: row-reverse; }
 
     .avatar {
-      width: 30px; height: 30px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      display: grid; place-items: center;
-      font-size: 15px;
+      display: grid;
+      place-items: center;
       flex-shrink: 0;
+      color: var(--muted);
     }
+
+    .avatar svg { width: 16px; height: 16px; }
     .avatar.agent { background: var(--agent-border); }
-    .avatar.user  { background: var(--user-bubble); }
+    .avatar.user  { background: var(--user-bg); }
 
     .bubble {
-      max-width: 72%;
-      padding: 12px 16px;
+      max-width: 70%;
+      padding: 11px 15px;
       border-radius: var(--radius);
-      font-size: 14.5px;
+      font-size: 14px;
       line-height: 1.55;
       white-space: pre-wrap;
       word-break: break-word;
     }
+
     .bubble.agent {
-      background: var(--agent-bubble);
+      background: var(--agent-bg);
       border: 1px solid var(--agent-border);
       border-bottom-left-radius: 4px;
     }
+
     .bubble.user {
-      background: var(--user-bubble);
+      background: var(--user-bg);
       border-bottom-right-radius: 4px;
     }
-    .bubble.typing {
-      display: flex; gap: 5px; align-items: center;
-      padding: 14px 18px;
-    }
-    .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); animation: bounce .9s infinite; }
-    .dot:nth-child(2) { animation-delay:.15s; }
-    .dot:nth-child(3) { animation-delay:.3s; }
-    @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-7px)} }
 
-    /* ── Bottom bar ── */
+    .bubble.typing {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      padding: 13px 16px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: bounce .9s infinite;
+    }
+
+    .dot:nth-child(2) { animation-delay: .15s; }
+    .dot:nth-child(3) { animation-delay: .3s; }
+
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-6px); }
+    }
+
+    /* Bottom bar */
     #bottombar {
-      padding: 16px 24px 20px;
+      padding: 14px 22px 18px;
       background: var(--surface);
       border-top: 1px solid var(--border);
       flex-shrink: 0;
@@ -171,216 +490,399 @@
     /* Text input row */
     #inputrow {
       display: flex;
-      gap: 10px;
-      margin-bottom: 14px;
+      gap: 9px;
+      margin-bottom: 12px;
     }
+
     #textInput {
       flex: 1;
       background: var(--surface2);
       border: 1px solid var(--border);
       color: var(--text);
-      border-radius: 10px;
-      padding: 10px 14px;
-      font-size: 14px;
+      border-radius: 9px;
+      padding: 10px 13px;
+      font-size: 13.5px;
       font-family: var(--font);
       outline: none;
       resize: none;
-      height: 42px;
+      height: 40px;
       line-height: 1.4;
       transition: border-color .15s;
     }
+
     #textInput:focus { border-color: var(--accent); }
+    #textInput::placeholder { color: var(--muted); }
+
     #sendBtn {
       background: var(--accent);
       border: none;
       color: #fff;
-      border-radius: 10px;
-      padding: 0 18px;
-      font-size: 18px;
+      border-radius: 9px;
+      padding: 0 16px;
       cursor: pointer;
       transition: .15s;
       flex-shrink: 0;
+      display: grid;
+      place-items: center;
     }
-    #sendBtn:hover { background: var(--accent2); }
-    #sendBtn:disabled { opacity: .4; cursor: not-allowed; }
 
-    /* Voice controls */
+    #sendBtn svg { width: 17px; height: 17px; }
+    #sendBtn:hover { background: var(--accent2); }
+    #sendBtn:disabled { opacity: .35; cursor: not-allowed; }
+
+    /* Voice row */
     #voicerow {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 13px;
     }
+
     #micBtn {
-      width: 52px; height: 52px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
-      border: 2px solid var(--border);
+      border: 1.5px solid var(--border2);
       background: var(--surface2);
       color: var(--text);
-      font-size: 22px;
       cursor: pointer;
-      display: grid; place-items: center;
+      display: grid;
+      place-items: center;
       transition: .2s;
       flex-shrink: 0;
     }
-    #micBtn:hover { border-color: var(--accent); }
+
+    #micBtn svg { width: 20px; height: 20px; }
+    #micBtn:hover { border-color: var(--accent); color: var(--accent); }
+
     #micBtn.listening {
       border-color: var(--accent);
-      background: rgba(255,76,43,.12);
+      background: var(--accent-glow);
+      color: var(--accent2);
       animation: micpulse 1s infinite;
     }
+
     @keyframes micpulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(255,76,43,.4); }
-      50%      { box-shadow: 0 0 0 12px rgba(255,76,43,0); }
+      0%,100% { box-shadow: 0 0 0 0 rgba(220,58,58,.3); }
+      50%      { box-shadow: 0 0 0 10px rgba(220,58,58,0); }
     }
+
     #micBtn.speaking {
-      border-color: #4caf50;
-      background: rgba(76,175,80,.1);
+      border-color: var(--green);
+      background: var(--green-glow);
+      color: var(--green);
     }
-    #micBtn:disabled { opacity: .35; cursor: not-allowed; }
+
+    #micBtn:disabled { opacity: .3; cursor: not-allowed; }
 
     #voiceHint {
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--muted);
-      line-height: 1.4;
+      line-height: 1.45;
     }
-    #voiceHint strong { color: var(--text); }
+
+    #voiceHint strong { color: var(--text); font-size: 12.5px; }
 
     #muteBtn {
       margin-left: auto;
       background: transparent;
       border: 1px solid var(--border);
       color: var(--muted);
-      border-radius: 8px;
-      padding: 6px 12px;
+      border-radius: 7px;
+      padding: 5px 11px;
       font-size: 12px;
       cursor: pointer;
       transition: .15s;
-    }
-    #muteBtn:hover { border-color: var(--accent2); color: var(--accent2); }
-    #muteBtn.muted { color: var(--accent); border-color: var(--accent); }
-
-    /* ── Welcome empty state ── */
-    #welcome {
-      margin: auto;
-      text-align: center;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 5px;
     }
-    #welcome .big-icon { font-size: 52px; line-height: 1; }
-    #welcome h2 { font-size: 20px; font-weight: 700; }
-    #welcome p  { font-size: 14px; color: var(--muted); max-width: 320px; line-height: 1.6; }
 
-    /* ── Toast ── */
+    #muteBtn svg { width: 13px; height: 13px; }
+    #muteBtn:hover { border-color: var(--border2); color: var(--text); }
+    #muteBtn.muted { color: var(--accent); border-color: rgba(220,58,58,.35); }
+
+    /* Toast */
     #toast {
       position: fixed;
-      bottom: 110px;
+      bottom: 100px;
       left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: #333;
-      color: #fff;
-      padding: 8px 18px;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--surface3);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 7px 16px;
       border-radius: 20px;
-      font-size: 13px;
+      font-size: 12.5px;
       opacity: 0;
       pointer-events: none;
-      transition: .25s;
+      transition: .22s;
       white-space: nowrap;
     }
+
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">🔥</div>
-  <div class="header-text">
-    <h1>Fire Alarm AI Agent</h1>
-    <p>Triage · Troubleshoot · Dispatch</p>
-  </div>
-  <div class="status-dot" title="Online"></div>
-</header>
+<!-- ══════════════════════════════════════
+     LANDING SCREEN
+══════════════════════════════════════ -->
+<div id="landing">
 
-<div id="callbar">
-  <label for="callerIdInput">Call ID</label>
-  <input id="callerIdInput" type="text" placeholder="e.g. customer-001" />
-  <button id="newCallBtn">+ New Call</button>
-</div>
-
-<div id="chat">
-  <div id="welcome">
-    <div class="big-icon">🎙️</div>
-    <h2>Ready for your call</h2>
-    <p>Enter a Call ID above, then press the mic button or type your message to begin.</p>
-  </div>
-</div>
-
-<div id="bottombar">
-  <div id="inputrow">
-    <textarea id="textInput" placeholder="Type a message…" rows="1"></textarea>
-    <button id="sendBtn" title="Send">➤</button>
-  </div>
-  <div id="voicerow">
-    <button id="micBtn" title="Hold to speak / click to toggle">🎙️</button>
-    <div id="voiceHint">
-      <strong id="micStatus">Click mic to start listening</strong><br>
-      Agent will speak responses aloud
+  <div class="brand">
+    <div class="brand-icon">
+      <!-- Shield + signal icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L4 6v6c0 4.8 3.4 9.3 8 10.3 4.6-1 8-5.5 8-10.3V6L12 2z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
     </div>
-    <button id="muteBtn">🔊 Mute agent</button>
+    <span class="brand-name">Alarm Panel AI</span>
   </div>
+
+  <div class="landing-heading">
+    <h1>How would you like to test the agent?</h1>
+    <p>AlarmCC handles triage, troubleshooting, and dispatch for all alarm panel systems — fire, burglar, and combo.</p>
+  </div>
+
+  <div class="mode-grid">
+
+    <div class="mode-card voice" data-mode="voice">
+      <div class="card-icon">
+        <!-- Microphone -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <h3>Voice</h3>
+        <p>Use your microphone to speak with the agent as you would over a real call.</p>
+      </div>
+      <div class="card-cta">
+        Start with voice
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <polyline points="13 6 19 12 13 18"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="mode-card text" data-mode="text">
+      <div class="card-icon">
+        <!-- Chat bubble -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div class="card-body">
+        <h3>Text Chat</h3>
+        <p>Type messages to interact with the agent and see responses in a chat interface.</p>
+      </div>
+      <div class="card-cta">
+        Start with text
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <polyline points="13 6 19 12 13 18"/>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="landing-note">Supports fire alarm, burglar alarm, and combo panel systems</p>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     APP SCREEN
+══════════════════════════════════════ -->
+<div id="app">
+
+  <header>
+    <div class="hdr-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L4 6v6c0 4.8 3.4 9.3 8 10.3 4.6-1 8-5.5 8-10.3V6L12 2z"/>
+        <path d="M9 12l2 2 4-4"/>
+      </svg>
+    </div>
+    <div class="hdr-text">
+      <h1>Alarm Panel AI</h1>
+      <p>Triage · Troubleshoot · Dispatch</p>
+    </div>
+    <div class="hdr-right">
+      <span id="modeBadge" class="mode-badge"></span>
+      <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>Online</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="sessionbar">
+    <label for="callerIdInput">Session</label>
+    <input id="callerIdInput" type="text" placeholder="e.g. customer-001" autocomplete="off" />
+    <button id="newSessionBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      New Session
+    </button>
+  </div>
+
+  <div id="chat">
+    <div id="welcome">
+      <div class="welcome-icon" id="welcomeIcon">
+        <!-- default: panel icon, swapped by mode -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <h2>Ready for your session</h2>
+      <p id="welcomeHint">Enter a session ID, then type a message or use the mic to begin.</p>
+    </div>
+  </div>
+
+  <div id="bottombar">
+    <div id="inputrow">
+      <textarea id="textInput" placeholder="Describe the issue with your alarm panel…" rows="1"></textarea>
+      <button id="sendBtn" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <div id="voicerow">
+      <button id="micBtn" title="Click to toggle mic">
+        <!-- mic icon (default); swapped to stop/speaker dynamically -->
+        <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </button>
+      <div id="voiceHint">
+        <strong id="micStatus">Click mic to start listening</strong><br>
+        Agent responses will be spoken aloud
+      </div>
+      <button id="muteBtn">
+        <svg id="muteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+        Mute agent
+      </button>
+    </div>
+  </div>
+
 </div>
 
 <div id="toast"></div>
 
 <script>
-  // ─── State ────────────────────────────────────────────────
-  let customerId = "";
-  let isMuted = false;
+  // ── SVG snippets used dynamically ───────────────────────────────────────────
+  const SVG = {
+    mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>`,
+    stop: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`,
+    speaker: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`,
+    speakerOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>`,
+    agentAvatar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 4.8 3.4 9.3 8 10.3 4.6-1 8-5.5 8-10.3V6L12 2z"/></svg>`,
+    userAvatar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  };
+
+  // ── State ────────────────────────────────────────────────────────────────────
+  let customerId  = "";
+  let isMuted     = false;
   let isListening = false;
-  let isSpeaking = false;
+  let isSpeaking  = false;
   let recognition = null;
-  let currentAudio = null;
+  let currentAudio= null;
+  let activeMode  = "text"; // "voice" | "text"
+  let autoRestart = false;  // auto-restart mic after agent finishes speaking
+  let finalBuffer = "";     // accumulated final speech transcript
+  let sendTimer   = null;   // debounce before sending
 
-  // ─── Elements ─────────────────────────────────────────────
-  const chat        = document.getElementById("chat");
-  const welcome     = document.getElementById("welcome");
-  const textInput   = document.getElementById("textInput");
-  const sendBtn     = document.getElementById("sendBtn");
-  const micBtn      = document.getElementById("micBtn");
-  const muteBtn     = document.getElementById("muteBtn");
-  const micStatus   = document.getElementById("micStatus");
-  const callerInput = document.getElementById("callerIdInput");
-  const newCallBtn  = document.getElementById("newCallBtn");
-  const toast       = document.getElementById("toast");
+  // ── Elements ─────────────────────────────────────────────────────────────────
+  const landingEl    = document.getElementById("landing");
+  const appEl        = document.getElementById("app");
+  const chat         = document.getElementById("chat");
+  const welcome      = document.getElementById("welcome");
+  const welcomeHint  = document.getElementById("welcomeHint");
+  const welcomeIcon  = document.getElementById("welcomeIcon");
+  const textInput    = document.getElementById("textInput");
+  const sendBtn      = document.getElementById("sendBtn");
+  const micBtn       = document.getElementById("micBtn");
+  const muteBtn      = document.getElementById("muteBtn");
+  const micStatus    = document.getElementById("micStatus");
+  const muteIcon     = document.getElementById("muteIcon");
+  const callerInput  = document.getElementById("callerIdInput");
+  const newSessionBtn= document.getElementById("newSessionBtn");
+  const modeBadge    = document.getElementById("modeBadge");
+  const toast        = document.getElementById("toast");
 
-  // ─── Call ID ──────────────────────────────────────────────
-  function getCallerId() {
-    return callerInput.value.trim() || "caller-" + Date.now();
-  }
-
-  callerInput.addEventListener("change", () => {
-    customerId = getCallerId();
+  // ── Landing → App transition ─────────────────────────────────────────────────
+  document.querySelectorAll(".mode-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      activeMode = card.dataset.mode;
+      transitionToApp();
+    });
   });
 
-  newCallBtn.addEventListener("click", () => {
-    const id = "call-" + Date.now();
+  function transitionToApp() {
+    landingEl.classList.add("fade-out");
+
+    setTimeout(() => {
+      landingEl.style.display = "none";
+      appEl.classList.add("visible");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => appEl.classList.add("fade-in"));
+      });
+      applyMode(activeMode);
+      // Auto-generate a session ID
+      if (!customerId) {
+        customerId = "session-" + Date.now();
+        callerInput.value = customerId;
+      }
+    }, 280);
+  }
+
+  function applyMode(mode) {
+    modeBadge.textContent = mode === "voice" ? "Voice" : "Text";
+    modeBadge.className   = "mode-badge " + mode;
+
+    if (mode === "voice") {
+      welcomeHint.textContent = "Enter a session ID, then press the mic to begin speaking.";
+      welcomeIcon.innerHTML = SVG.mic;
+    } else {
+      welcomeHint.textContent = "Enter a session ID, then type a message to begin.";
+      welcomeIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+    }
+  }
+
+  // ── Session handling ──────────────────────────────────────────────────────────
+  callerInput.addEventListener("change", () => { customerId = callerInput.value.trim(); });
+
+  newSessionBtn.addEventListener("click", () => {
+    const id = "session-" + Date.now();
     callerInput.value = id;
     customerId = id;
     clearChat();
-    showToast("New call started: " + id);
+    showToast("New session started");
   });
 
-  // ─── Chat helpers ─────────────────────────────────────────
+  // ── Chat helpers ─────────────────────────────────────────────────────────────
   function clearChat() {
     chat.innerHTML = "";
     chat.appendChild(welcome);
     welcome.style.display = "";
   }
 
-  function hideWelcome() {
-    welcome.style.display = "none";
-  }
+  function hideWelcome() { welcome.style.display = "none"; }
 
   function addBubble(role, text) {
     hideWelcome();
@@ -389,7 +891,7 @@
 
     const av = document.createElement("div");
     av.className = "avatar " + (role === "user" ? "user" : "agent");
-    av.textContent = role === "user" ? "👤" : "🤖";
+    av.innerHTML = role === "user" ? SVG.userAvatar : SVG.agentAvatar;
 
     const b = document.createElement("div");
     b.className = "bubble " + (role === "user" ? "user" : "agent");
@@ -409,7 +911,7 @@
 
     const av = document.createElement("div");
     av.className = "avatar agent";
-    av.textContent = "🤖";
+    av.innerHTML = SVG.agentAvatar;
 
     const b = document.createElement("div");
     b.className = "bubble agent typing";
@@ -425,27 +927,27 @@
     if (r) r.remove();
   }
 
-  // ─── Toast ────────────────────────────────────────────────
-  function showToast(msg, ms = 2400) {
+  // ── Toast ─────────────────────────────────────────────────────────────────────
+  function showToast(msg, ms = 2200) {
     toast.textContent = msg;
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), ms);
   }
 
-  // ─── Send message ─────────────────────────────────────────
+  // ── Send message ──────────────────────────────────────────────────────────────
   async function sendMessage(text) {
     text = text.trim();
     if (!text) return;
 
     if (!customerId) {
-      customerId = getCallerId();
+      customerId = "session-" + Date.now();
       callerInput.value = customerId;
     }
 
     addBubble("user", text);
     textInput.value = "";
     sendBtn.disabled = true;
-    micBtn.disabled = true;
+    micBtn.disabled  = true;
     addTyping();
 
     try {
@@ -458,21 +960,28 @@
       removeTyping();
 
       if (data.success) {
-        addBubble("agent", data.agentResponse);
-        speak(data.agentResponse);
+        const raw = data.agentResponse;
+        const callEnded = raw.includes("[END_CALL]") || raw.includes("[DISPATCH_CONFIRMED]");
+        const cleaned = raw.replace(/\[END_CALL\]/g, "").replace(/\[DISPATCH_CONFIRMED\]/g, "").trim();
+        if (callEnded) {
+          autoRestart = false;
+          showToast("Session complete", 3500);
+        }
+        addBubble("agent", cleaned);
+        speak(cleaned);
       } else {
-        addBubble("agent", "⚠️ Error: " + (data.error || "Unknown error"));
+        addBubble("agent", "Error: " + (data.error || "Unknown error"));
       }
-    } catch (err) {
+    } catch {
       removeTyping();
-      addBubble("agent", "⚠️ Could not reach server. Is it running?");
+      addBubble("agent", "Could not reach the server. Please check that it is running.");
     } finally {
       sendBtn.disabled = false;
-      micBtn.disabled = false;
+      micBtn.disabled  = false;
     }
   }
 
-  // ─── Text input handling ──────────────────────────────────
+  // ── Text input handling ────────────────────────────────────────────────────────
   sendBtn.addEventListener("click", () => sendMessage(textInput.value));
   textInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -481,24 +990,28 @@
     }
   });
 
-  // ─── TTS via server (agent speaking) ─────────────────────
+  // ── TTS (agent speaking) ──────────────────────────────────────────────────────
   function stopAudio() {
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio = null;
-    }
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
     isSpeaking = false;
     micBtn.classList.remove("speaking");
-    micBtn.textContent = "🎙️";
+    micBtn.innerHTML = SVG.mic;
+  }
+
+  function maybeAutoRestart() {
+    if (autoRestart && activeMode === "voice" && !isMuted && !isListening) {
+      textInput.value = "";
+      micStatus.textContent = "Listening…";
+      setTimeout(() => { try { recognition.start(); } catch(e) {} }, 150);
+    }
   }
 
   async function speak(text) {
-    if (isMuted) return;
-
+    if (isMuted) { maybeAutoRestart(); return; }
     stopAudio();
     isSpeaking = true;
     micBtn.classList.add("speaking");
-    micBtn.textContent = "🔊";
+    micBtn.innerHTML = SVG.speaker;
 
     try {
       const res = await fetch("/tts", {
@@ -506,86 +1019,94 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
-
-      if (!res.ok) throw new Error("TTS request failed: " + res.status);
-
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
+      if (!res.ok) throw new Error("TTS " + res.status);
+      const blob  = await res.blob();
+      const url   = URL.createObjectURL(blob);
       const audio = new Audio(url);
       currentAudio = audio;
-
-      audio.onended = () => { URL.revokeObjectURL(url); stopAudio(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); stopAudio(); };
-
+      audio.onended = () => { URL.revokeObjectURL(url); stopAudio(); maybeAutoRestart(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); stopAudio(); maybeAutoRestart(); };
       audio.play();
     } catch (err) {
       console.error("TTS error:", err);
       stopAudio();
-      // Fallback: device speechSynthesis if server TTS fails
       if ("speechSynthesis" in window) {
-        const utter = new SpeechSynthesisUtterance(text);
-        window.speechSynthesis.speak(utter);
+        const u = new SpeechSynthesisUtterance(text);
+        u.onend = () => maybeAutoRestart();
+        window.speechSynthesis.speak(u);
+      } else {
+        maybeAutoRestart();
       }
     }
   }
 
   muteBtn.addEventListener("click", () => {
     isMuted = !isMuted;
-    muteBtn.textContent = isMuted ? "🔇 Unmute agent" : "🔊 Mute agent";
+    muteBtn.innerHTML = (isMuted ? SVG.speakerOff : SVG.speaker) + (isMuted ? " Unmute agent" : " Mute agent");
     muteBtn.classList.toggle("muted", isMuted);
     if (isMuted) { stopAudio(); window.speechSynthesis?.cancel(); }
     showToast(isMuted ? "Agent voice muted" : "Agent voice on");
   });
 
-  // ─── Speech Recognition (user speaking) ──────────────────
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  // ── Speech recognition (user speaking) ────────────────────────────────────────
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
+  if (!SpeechRec) {
     micBtn.disabled = true;
-    micStatus.textContent = "Voice not supported in this browser (use Chrome)";
+    micStatus.textContent = "Voice input not supported — use Chrome";
   } else {
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
+    recognition = new SpeechRec();
+    recognition.continuous    = true;  // keep listening through pauses
+    recognition.interimResults= true;
+    recognition.lang          = "en-US";
 
     recognition.onstart = () => {
       isListening = true;
+      finalBuffer = "";
       micBtn.classList.add("listening");
-      micBtn.textContent = "⏹";
+      micBtn.innerHTML = SVG.stop;
       micStatus.textContent = "Listening…";
       stopAudio();
       window.speechSynthesis?.cancel();
     };
 
     recognition.onresult = (e) => {
-      let interim = "", final = "";
+      let interim = "";
       for (const r of e.results) {
-        if (r.isFinal) final += r[0].transcript;
+        if (r.isFinal) finalBuffer += r[0].transcript + " ";
         else interim += r[0].transcript;
       }
-      textInput.value = final || interim;
+      textInput.value = finalBuffer + interim;
+
+      // Reset the send timer each time new final speech arrives
+      if (finalBuffer) {
+        clearTimeout(sendTimer);
+        sendTimer = setTimeout(() => recognition.stop(), 1500);
+      }
     };
 
     recognition.onend = () => {
       isListening = false;
+      clearTimeout(sendTimer);
+      sendTimer = null;
       micBtn.classList.remove("listening");
-      micBtn.textContent = "🎙️";
+      micBtn.innerHTML = SVG.mic;
       micStatus.textContent = "Click mic to start listening";
-
-      const transcript = textInput.value.trim();
-      if (transcript) {
-        sendMessage(transcript);
-      }
+      const transcript = (finalBuffer || textInput.value).trim();
+      finalBuffer = "";
+      if (transcript) sendMessage(transcript);
     };
 
     recognition.onerror = (e) => {
       isListening = false;
+      clearTimeout(sendTimer);
+      sendTimer = null;
+      finalBuffer = "";
       micBtn.classList.remove("listening");
-      micBtn.textContent = "🎙️";
+      micBtn.innerHTML = SVG.mic;
       if (e.error === "not-allowed") {
         micStatus.textContent = "Microphone access denied";
-        showToast("Please allow microphone access in your browser");
+        showToast("Allow microphone access in your browser");
       } else if (e.error !== "no-speech") {
         micStatus.textContent = "Voice error: " + e.error;
       } else {
@@ -596,8 +1117,10 @@
     micBtn.addEventListener("click", () => {
       if (isSpeaking) { stopAudio(); window.speechSynthesis?.cancel(); return; }
       if (isListening) {
+        autoRestart = false;
         recognition.stop();
       } else {
+        autoRestart = (activeMode === "voice");
         textInput.value = "";
         recognition.start();
       }

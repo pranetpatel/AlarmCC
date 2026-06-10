@@ -576,7 +576,7 @@ function getRequestWebhookBase(req) {
 
 app.get("/health", (req, res) => {
   res.json({
-    status: "Fire Alarm Agent is running",
+    status: "Alarm Panel Agent is running",
     timestamp: new Date().toISOString(),
     services: {
       openai:  !!process.env.OPENAI_API_KEY,
@@ -985,7 +985,7 @@ app.get("/calls", async (req, res) => {
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
-    console.log(`\n🔥 Fire Alarm Agent API  →  http://localhost:${PORT}`);
+    console.log(`\nAlarm Panel Agent API  →  http://localhost:${PORT}`);
     console.log(`\n── Web Testing UI ──────────────────────────────────────`);
     console.log(`   GET  /                     — chat UI (web testing)`);
     console.log(`   POST /process-call         — send message (web)`);
