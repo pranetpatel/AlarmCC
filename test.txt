@@ -1,7 +1,21 @@
 
-  "Hi, my fire panel won't stop beeping. It's a Notifier NFS2-3030 at my office.",
-  "The display shows error code star 2, low battery I think.",
-  "I checked the terminals, they're tight. It's been beeping for two days.",
-  "Yes, I'm okay trying the steps you suggest.",
-  "I unplugged the modem for 30 seconds like you said but the panel still shows trouble.",
-  "Okay, schedule a technician for tomorrow morning if that's cheaper.
+  "Hi uh, my fire panel won't stop beeping.",
+  "I don't really know the brand — I think it might say BFC Neo on it?",
+  "The trouble light is on. I don't see any error code or numbers on the display.",
+  "I entered my code and it stopped the beeping, but the trouble light stayed on.",
+  "No, I haven't tried much else. How do I fix it?",
+  "It's not a smoke detector — whatever's wrong is on the fire panel itself.",
+  "I can check the wires if you want, but I'd rather have someone come look at it.",
+  "Yeah, can you send a technician tomorrow morning if that's cheaper?",
+
+--- IQ Panel (burglar/security alarm) ---
+
+  "Hey, um, my alarm panel keeps chirping every like thirty seconds.",
+  "It's the touchscreen one on the wall — I think it's an IQ panel? Qolsys maybe?",
+  "It's at my house, not a business. The screen says sensor trouble or something.",
+  "I don't know which sensor. It might be the front door one?",
+  "I tried disarming it with my code but the chirping came back after a few minutes.",
+  "The WiFi symbol on the screen has an X on it if that means anything.",
+  "I changed the battery in the door sensor last year, I don't have a ladder for the motion one.",
+  "Can you walk me through it or should I just get someone out here?",
+

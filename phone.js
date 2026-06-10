@@ -127,14 +127,10 @@ function escapeSSML(text) {
     .replace(/'/g, "&apos;");
 }
 
-/** Wrap cleaned text in SSML with sentence-break pauses */
+/** Wrap cleaned text in SSML — no sentence breaks (they add dead air on phone). */
 function toSSML(text) {
   const safe = escapeSSML(text);
-  const sentences = safe.match(/[^.!?]+[.!?]+/g);
-  if (!sentences || sentences.length <= 1) {
-    return `<speak>${safe}</speak>`;
-  }
-  return `<speak>${sentences.join('<break time="300ms"/>')}</speak>`;
+  return `<speak>${safe}</speak>`;
 }
 
 /**
@@ -193,7 +189,8 @@ function buildResponseNcco(text, callUuid, end = false, webhookBase) {
   const capped  = capPhoneText(cleaned) || "I didn't get a response. Please hold.";
   const spokenText = process.env.VONAGE_TTS_VOICE ? capped : toSSML(capped);
 
-  const talkAction = buildTalkAction(spokenText);
+  // bargeIn: true lets callers interrupt the AI mid-sentence (matches greeting behavior)
+  const talkAction = buildTalkAction(spokenText, { bargeIn: true });
 
   // Vonage ends the call when the NCCO runs out of actions. Always follow
   // a response with an input action unless we are deliberately hanging up.
@@ -210,15 +207,44 @@ function buildInputAction(callUuid, webhookBase) {
     action: "input",
     type: ["speech"],
     speech: {
-      endOnSilence: 1,
+      endOnSilence: 2.5,   // was 1 — stops cutting callers off mid-sentence
       startTimeout: 15,
-      maxDuration: 30,
+      maxDuration: 45,     // was 30 — room for longer descriptions
       language: "en-US",
-      sensitivity: 50,
+      sensitivity: 40,     // was 50 — reduces false end-of-speech triggers
     },
     eventUrl: [`${webhookBase}/phone/speech-input`],
     eventMethod: "POST",
   };
+}
+
+/**
+ * Build an immediate filler NCCO to send while AI processes in the background.
+ * The filler phrase plays (~1.5s), then the notify action fires the ai-ready
+ * webhook, which awaits the pending AI promise and returns the real response NCCO.
+ * @param {string} callUuid
+ * @param {string} [webhookBase]
+ */
+function buildFillerNcco(callUuid, webhookBase) {
+  webhookBase = webhookBase || getWebhookBase();
+  const fillers = [
+    "Got it, one sec.",
+    "Okay, hang on a moment.",
+    "Sure, let me check that.",
+    "Alright, just a moment.",
+  ];
+  const text = fillers[Math.floor(Math.random() * fillers.length)];
+  // No bargeIn on filler — it must complete so the notify action fires
+  const talkText = process.env.VONAGE_TTS_VOICE ? text : `<speak>${escapeSSML(text)}</speak>`;
+  return [
+    buildTalkAction(talkText),
+    {
+      action: "notify",
+      payload: { uuid: callUuid, webhookBase },
+      eventUrl: [`${webhookBase}/phone/ai-ready`],
+      eventMethod: "POST",
+    },
+  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -276,5 +302,6 @@ module.exports = {
   makeVoiceCall,
   buildGreetingNcco,
   buildResponseNcco,
+  buildFillerNcco,
   isCallEnding,
 };

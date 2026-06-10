@@ -5,7 +5,7 @@ const { OpenAI } = require("openai");
 
 const db     = require("./database");
 const { sendEmail, templates } = require("./email");
-const { sendSMS, makeVoiceCall, buildGreetingNcco, buildResponseNcco, isCallEnding } = require("./phone");
+const { sendSMS, makeVoiceCall, buildGreetingNcco, buildResponseNcco, buildFillerNcco, isCallEnding } = require("./phone");
 
 dotenv.config();
 
@@ -22,6 +22,11 @@ dotenv.config();
 // Tracks UUIDs that have already received a 'completed' event so stale
 // speech-input webhooks arriving after hangup are handled gracefully.
 const completedCallUUIDs = new Set();
+
+// ─── Async filler pattern ─────────────────────────────────────────────────────
+// Stores pending AI promises keyed by call UUID. speech-input starts the AI,
+// returns a filler NCCO immediately, then ai-ready awaits the result.
+const pendingAiResponses = new Map();
 
 const app = express();
 
@@ -293,30 +298,76 @@ IMPORTANT
 // Shared AI processing — used by BOTH web /process-call AND phone webhooks
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PHONE_MODE_SUFFIX = `\n\nPHONE MODE RULES — follow these strictly:
-- You are a real human dispatcher named Alex. Never say you are AI.
-- Talk the way a real person would on the phone: natural, relaxed, direct. Use contractions (don't, I'll, that's, let's).
-- Use natural filler and acknowledgment phrases like "Got it", "Okay", "Sure thing", "Yeah that makes sense", "Alright", "No worries" — but only one per turn, naturally.
-- Max 1-2 short sentences per reply. One question at a time only.
-- Never list steps — say them one at a time as a follow-up.
-- No markdown, no bullet points, no JSON, no asterisks.
-- Say "error two" not "*2", "error five" not "*5", etc.
-- If the customer seems stressed, acknowledge it briefly before helping: "Yeah, I get it — let's sort this out."
-- Sound like you've handled this exact problem a hundred times before.
+// Compact phone-specific prompt (~80 lines vs 290+ for SYSTEM_PROMPT).
+// Sent every turn on phone calls — token savings = latency savings.
+const PHONE_SYSTEM_PROMPT = `You are Alex, a fire alarm dispatch coordinator. You are a real person — never admit to being AI.
 
-DISPATCH INTAKE — collect these BEFORE offering dispatch (one question at a time):
-1. Site — business/property name and full address
-2. System — brand and model on the panel (Mircom, Notifier, Edwards, etc.)
-3. Symptom — what is happening right now (beeping, trouble light, offline, false alarm)
-4. Error code — display code if any (say "error three", never use asterisks)
-5. Troubleshooting — what was already tried and the result
-6. Urgency — is monitoring down, active alarm, or nuisance trouble?
-7. On-site contact — name and phone of person at the property
-8. Access — gate codes, panel location, after-hours access notes
+CALL CONTROL TOKENS — append on their own line ONLY when ALL conditions met:
+[END_CALL]: Customer explicitly said goodbye OR confirmed issue resolved AND said they are done. NEVER after just your first response.
+[DISPATCH_CONFIRMED]: All 7 dispatch items collected AND customer verbally said "yes, send someone." NEVER before verbal confirmation.
+When in doubt, keep the conversation going.
 
-Do NOT offer dispatch until items 1-5 are covered (or caller genuinely doesn't know — note that).
-Confirm pricing and dispatch window verbally, then get explicit "yes, send someone" before using [DISPATCH_CONFIRMED].
-When dispatch is confirmed, append [DISPATCH_CONFIRMED] on its own line after your spoken reply.`;
+PHONE STYLE:
+- Talk like a real person: contractions, natural filler (Got it / Okay / Yeah / Sure thing), short sentences.
+- Max 1–2 sentences per turn. ONE question at a time. Wait for the answer before asking the next.
+- No markdown, bullets, JSON, or asterisks in your spoken reply.
+- Say error codes as words: "error two" not "*2", "error five" not "*5".
+- If customer seems stressed: "Yeah, I get it — let's sort this out." One empathy line, then help.
+- If customer pauses, says "um", or trails off: say "Take your time." Do not rush to the next question.
+- Sound like you've fixed this exact problem a hundred times.
+
+INTAKE FLOW — follow this order exactly, one question per turn. NEVER open with "What brand and model?":
+1. SYMPTOM: "What's going on right now — constant beeping, trouble light, or full alarm?"
+2. LOCATION: "Is this a business, apartment building, or a house?"
+3. BRAND: "What name is on the front of the panel?" [common: Notifier, Edwards, Mircom, Siemens, Silent Knight]
+4. DISPLAY: "What does the display say right now?" (only if they mention having a screen)
+5. If no display: "Is there a yellow TROUBLE light on? Is the beeping steady or every few seconds?"
+Map symptoms to likely codes internally — only ask for the actual error number if they mention seeing a display.
+
+ACKNOWLEDGE first before troubleshooting: "Yeah, two days of beeping nonstop — that's rough, let's fix it."
+
+COMMON ERROR CODES:
+*2 Low Battery — Check terminals tight/clean. Wait 24h on AC power. Still beeping = replace 12V 7Ah battery.
+*3 Comm Fail — Check phone/internet line. Unplug modem 30s, replug. Panel should show online after.
+*5 Detector — Which zone? Check for dust or webs. Vacuum gently. Still beeping = replace detector.
+*7 Power Issue — Check cord. Flip breaker OFF then ON. Wait 2 min for reboot.
+*10 False Alarm — Identify triggering detector. Remove source (steam, smoke). Reset panel.
+*15 System Trouble — Check all sensors connected. No damaged wires? If persists, dispatch needed.
+
+PANEL KNOWLEDGE:
+- NOTIFIER NFS2-3030 / NFS-320: Press ACK to silence. Battery = 12V 7Ah inside panel door. RESET after fixing fault.
+- MIRCOM FX-2000: SILENCE key for trouble beep. Zone descriptor on display shows which zone.
+- EDWARDS EST3 / EST4: Network node troubles common. ACKNOWLEDGE button. Node may need power cycle.
+- SILENT KNIGHT 5208 / 5700: ACK to silence. Battery in panel bottom. Same steps as Notifier for low battery.
+- DSC / HONEYWELL VISTA: Confirm it says FIRE — residential units are often burglar panels, not fire panels.
+- UNKNOWN PANEL: "Is there an ACK or ACKNOWLEDGE button? A RESET button?" Both are safe to press.
+NEVER suggest disabling zones, bypassing sensors, or cutting power to a fire panel.
+
+SAFE UNIVERSAL STEPS (any UL-listed panel):
+1. Press ACK / ACKNOWLEDGE — silences audible beeping, does NOT clear the alarm condition
+2. Check battery compartment (inside panel door or sub-panel below) — look for swollen or loose battery
+3. Check AC power LED — green = mains power present
+
+TROUBLESHOOTING RULES:
+- Give ONE step at a time. Wait for customer to complete it, then give the next.
+- If a step fails twice, stop and offer dispatch.
+- If unsure: "That one's better for a tech to look at — want me to get someone out there?"
+- Active alarm / monitoring down / no power = offer dispatch immediately.
+
+DISPATCH — collect in order, one question per turn:
+1. Property name and full street address
+2. System brand and model (if known; note if unknown)
+3. Current symptom and any error code on display
+4. What has been tried and the result
+5. Is monitoring down or is there an active alarm?
+6. On-site contact name and phone number
+7. Access info: gate codes, panel location, after-hours access
+
+Pricing — quote before asking for confirmation:
+- Scheduled (next day) = $75–125 base + parts + labor (typical $100–300 total)
+- Immediate (2–4 hr) = $150–250 base + parts + labor (typical $200–400 total)
+Get explicit verbal yes, then append [DISPATCH_CONFIRMED] on its own line after your spoken reply.
+Do NOT generate JSON on phone calls.`;
 
 // Minimum user turns before the agent is allowed to end a phone call.
 const MIN_PHONE_TURNS_BEFORE_END = 3;
@@ -447,30 +498,42 @@ async function sendContractorDispatchEmail(customerId, { force = false } = {}) {
  */
 async function processWithAI(customerId, message, opts = {}) {
   const channel = opts.channel || "web";
-  const conv = await db.createConversation(customerId);
+  const t0 = Date.now();
 
-  let history = await db.getFullHistory(customerId);
+  // Parallelize conversation fetch + conversation creation (cheap if already exists)
+  const [conv, history] = await Promise.all([
+    db.createConversation(customerId),
+    db.getFullHistory(customerId),
+  ]);
+
   let openaiMessages = history ? history.messages : [];
 
   if (openaiMessages.length === 0) {
-    const systemContent = channel === "phone"
-      ? SYSTEM_PROMPT + PHONE_MODE_SUFFIX
-      : SYSTEM_PROMPT;
+    // Phone uses compact PHONE_SYSTEM_PROMPT; web uses full SYSTEM_PROMPT
+    const systemContent = channel === "phone" ? PHONE_SYSTEM_PROMPT : SYSTEM_PROMPT;
     await db.addMessage(conv.id, "system", systemContent);
     openaiMessages = [{ role: "system", content: systemContent }];
   }
 
-  await db.addMessage(conv.id, "user", message);
+  // Push user message into in-memory array synchronously before firing both ops
   openaiMessages.push({ role: "user", content: message });
 
   const model     = channel === "phone" ? "gpt-4o-mini" : "gpt-4-turbo";
-  const maxTokens = channel === "phone" ? 90 : 1000;
+  const maxTokens = channel === "phone" ? 100 : 1000;
 
-  const response = await openai.chat.completions.create({
-    model,
-    max_tokens: maxTokens,
-    messages: openaiMessages,
-  });
+  if (channel === "phone") {
+    console.log(`[Phone] ⏱ t+${Date.now() - t0}ms → OpenAI start (${openaiMessages.length} msgs, ${model})`);
+  }
+
+  // Parallelize: DB write of user message + OpenAI call run concurrently
+  const [, response] = await Promise.all([
+    db.addMessage(conv.id, "user", message),
+    openai.chat.completions.create({ model, max_tokens: maxTokens, messages: openaiMessages }),
+  ]);
+
+  if (channel === "phone") {
+    console.log(`[Phone] ⏱ t+${Date.now() - t0}ms → OpenAI done`);
+  }
 
   let agentResponse = response.choices[0].message.content;
 
@@ -483,6 +546,10 @@ async function processWithAI(customerId, message, opts = {}) {
 
   await db.addMessage(conv.id, "assistant", agentResponse);
 
+  if (channel === "phone") {
+    console.log(`[Phone] ⏱ t+${Date.now() - t0}ms → DB saved, total processWithAI done`);
+  }
+
   // Auto-detect status and trigger contractor email on dispatch
   if (isDispatchConfirmed(agentResponse, channel)) {
     await db.setConversationStatus(customerId, "dispatched");
@@ -493,13 +560,6 @@ async function processWithAI(customerId, message, opts = {}) {
   }
 
   return agentResponse;
-}
-
-/** Count how many user messages exist for a phone/web customer. */
-async function getUserTurnCount(customerId) {
-  const history = await db.getFullHistory(customerId);
-  if (!history) return 0;
-  return history.messages.filter((m) => m.role === "user").length;
 }
 
 /** Derive public webhook base from the incoming request (falls back to env). */
@@ -536,6 +596,17 @@ app.get("/conversations", async (req, res) => {
   try {
     const all = await db.getAllConversations();
     res.json({ success: true, conversations: all });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Full transcript for a specific customer — useful for call review
+app.get("/conversations/:customerId", async (req, res) => {
+  try {
+    const conv = await db.getConversation(req.params.customerId);
+    if (!conv) return res.status(404).json({ error: "Conversation not found" });
+    res.json({ success: true, ...conv });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -754,22 +825,24 @@ app.post("/phone/incoming-call", async (req, res) => {
 /**
  * POST /phone/speech-input   ← Vonage speech input event URL
  *
- * Called after the caller finishes speaking.
- * We process the transcription with the AI and return a new NCCO.
+ * Returns a filler NCCO immediately while AI processes in the background.
+ * The filler (e.g. "Got it, one sec.") + notify action means the caller hears
+ * something within ~100ms. The notify fires ai-ready once the filler finishes.
  */
 app.post("/phone/speech-input", async (req, res) => {
+  const t0 = Date.now();
   const { uuid, speech } = req.body;
 
-  console.log(`[Phone] 🎙  Speech input for UUID: ${uuid}`);
+  console.log(`[Phone] 🎙  Speech input received | UUID: ${uuid} | t+0ms`);
 
-  const customerId   = `phone-${uuid}`;
-  const rawText      = speech?.results?.[0]?.text;
-  const transcript   = rawText && rawText !== "undefined" ? rawText.trim() : "";
-  const confidence   = speech?.results?.[0]?.confidence || 0;
+  const customerId = `phone-${uuid}`;
+  const rawText    = speech?.results?.[0]?.text;
+  const transcript = rawText && rawText !== "undefined" ? rawText.trim() : "";
+  const confidence = speech?.results?.[0]?.confidence || 0;
 
   console.log(`[Phone] Transcription (${Math.round(confidence * 100)}%): "${transcript}"`);
 
-  // If call already completed, return a silent hangup NCCO — don't reprompt
+  // If call already completed, return a silent no-op — don't reprompt
   if (completedCallUUIDs.has(uuid)) {
     console.log(`[Phone] UUID ${uuid} already completed — ignoring stale speech-input`);
     return res.json([{ action: "talk", text: "", language: "en-US" }]);
@@ -777,48 +850,89 @@ app.post("/phone/speech-input", async (req, res) => {
 
   const webhookBase = getRequestWebhookBase(req);
 
-  // Handle no speech / low confidence / "undefined" transcript
+  // No speech received
   if (!transcript) {
     const timeoutReason = speech?.timeout_reason || "none";
     console.log(`[Phone] No usable transcript (timeout: ${timeoutReason})`);
     return res.json(buildResponseNcco(
-      "Sorry, I didn't catch that. Could you repeat?",
-      uuid,
-      false,
-      webhookBase
+      "Sorry, I didn't catch that. Could you say that again?",
+      uuid, false, webhookBase
     ));
   }
 
-  // Process with the shared AI function
-  let agentResponse;
-  let userTurns = 0;
-  try {
-    agentResponse = await processWithAI(customerId, transcript, { channel: "phone" });
-    userTurns = await getUserTurnCount(customerId);
-  } catch (err) {
-    console.error("[Phone] AI/DB error:", err.message);
-    agentResponse = "I'm having a brief technical issue. Please tell me again what's happening with your system.";
+  // Low-confidence transcript — asking to repeat is better than processing garbage
+  if (confidence < 0.6) {
+    console.log(`[Phone] Low confidence (${Math.round(confidence * 100)}%) — asking repeat`);
+    return res.json(buildResponseNcco(
+      "Sorry, I missed that last part — could you say that again?",
+      uuid, false, webhookBase
+    ));
   }
 
-  let ending = isCallEnding(agentResponse);
+  // Start AI processing in background immediately (don't await here)
+  const aiPromise = (async () => {
+    try {
+      const agentResponse = await processWithAI(customerId, transcript, { channel: "phone" });
+      const ending = isCallEnding(agentResponse);
+      console.log(`[Phone] ⏱ AI total: ${Date.now() - t0}ms | ending=${ending}`);
+      return { agentResponse, ending };
+    } catch (err) {
+      console.error("[Phone] AI/DB error:", err.message);
+      return {
+        agentResponse: "I'm having a brief technical issue. Can you tell me again what's happening with your system?",
+        ending: false,
+      };
+    }
+  })();
 
-  // Vonage hangs up when we return talk without a following input action.
-  // Block premature hangups until the caller has had a real back-and-forth.
-  if (userTurns < MIN_PHONE_TURNS_BEFORE_END && ending) {
-    console.warn(`[Phone] Blocked early hangup on turn ${userTurns} — keeping call open`);
-    agentResponse = agentResponse.replace(/\[END_CALL\]/g, "").trim();
-    ending = false;
+  pendingAiResponses.set(uuid, aiPromise);
+  // Clean up stale promises after 90s in case ai-ready never fires
+  setTimeout(() => pendingAiResponses.delete(uuid), 90000);
+
+  // Respond immediately with filler + notify — caller hears something in <200ms
+  const ncco = buildFillerNcco(uuid, webhookBase);
+  console.log(`[Phone] ⏱ t+${Date.now() - t0}ms → filler NCCO sent`);
+  res.json(ncco);
+});
+
+/**
+ * POST /phone/ai-ready   ← Vonage notify action fires this after filler plays
+ *
+ * Awaits the pending AI promise and returns the real response NCCO.
+ * By the time this fires (~1.5s after speech-input), the AI is often done
+ * or nearly done, so the caller hears the response with minimal silence.
+ */
+app.post("/phone/ai-ready", async (req, res) => {
+  const t0 = Date.now();
+  // Vonage sends notify payload under the 'payload' key
+  const payload = req.body?.payload || req.body;
+  const uuid = payload?.uuid;
+  const webhookBase = payload?.webhookBase || getRequestWebhookBase(req);
+
+  console.log(`[Phone] 🔔 ai-ready for UUID: ${uuid} | t+0ms`);
+
+  const aiPromise = pendingAiResponses.get(uuid);
+
+  if (!aiPromise) {
+    console.warn(`[Phone] No pending AI for UUID: ${uuid} — sending fallback`);
+    return res.json(buildResponseNcco(
+      "Sorry, something went wrong on my end. What were you saying about your system?",
+      uuid, false, webhookBase
+    ));
   }
 
-  const ncco = buildResponseNcco(agentResponse, uuid, ending, webhookBase);
-  console.log(`[Phone] Turn ${userTurns} | ending=${ending} | NCCO: ${ncco.map((a) => a.action).join(" → ")}`);
+  const { agentResponse, ending } = await aiPromise;
+  pendingAiResponses.delete(uuid);
 
-  // Mark call completed if conversation is ending (non-blocking)
+  console.log(`[Phone] ⏱ ai-ready waited ${Date.now() - t0}ms | ending=${ending}`);
+
   if (ending) {
     db.upsertCall({ callId: uuid, status: "completed" })
       .catch((e) => console.error("[Phone] Failed to update call status:", e.message));
   }
 
+  const ncco = buildResponseNcco(agentResponse, uuid, ending, webhookBase);
+  console.log(`[Phone] NCCO: ${ncco.map((a) => a.action).join(" → ")}`);
   res.json(ncco);
 });
 
@@ -876,7 +990,8 @@ if (require.main === module) {
     console.log(`   GET  /                     — chat UI (web testing)`);
     console.log(`   POST /process-call         — send message (web)`);
     console.log(`   GET  /conversations        — list all conversations`);
-    console.log(`   GET  /conversation/:id     — view conversation`);
+    console.log(`   GET  /conversations/:id    — full transcript for one customer`);
+    console.log(`   GET  /conversation/:id     — view conversation (legacy alias)`);
     console.log(`   DELETE /conversation/:id   — delete conversation`);
     console.log(`\n── Email (Resend) ──────────────────────────────────────`);
     console.log(`   POST /send-email           — { to, customerId, emailType }`);
@@ -884,7 +999,8 @@ if (require.main === module) {
     console.log(`   POST /phone/send-sms       — { phoneNumber, message }`);
     console.log(`   POST /phone/make-call      — { phoneNumber, message }`);
     console.log(`   POST /phone/incoming-call  — Vonage answer webhook`);
-    console.log(`   POST /phone/speech-input   — Vonage ASR webhook`);
+    console.log(`   POST /phone/speech-input   — Vonage ASR webhook (returns filler immediately)`);
+    console.log(`   POST /phone/ai-ready       — Vonage notify webhook (delivers real AI response)`);
     console.log(`   POST /phone/event          — Vonage event webhook`);
     console.log(`   GET  /calls                — list all call records`);
     console.log(`\n── Other ───────────────────────────────────────────────`);
