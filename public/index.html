@@ -655,6 +655,17 @@
       min-height: 18px;
     }
 
+    #phoneCaption {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+      max-width: 300px;
+      line-height: 1.45;
+      font-style: italic;
+      opacity: .75;
+      margin-top: 4px;
+    }
+
     /* Phone controls */
     .phone-controls {
       display: flex;
@@ -919,6 +930,7 @@
       <div class="phone-meta">
         <div id="phoneStatus">Tap call to connect</div>
         <div id="callTimer"></div>
+        <div id="phoneCaption"></div>
       </div>
     </div>
 
@@ -1021,6 +1033,7 @@
   const phoneMuteBtn   = document.getElementById("phoneMuteBtn");
   const phoneSpeakerBtn= document.getElementById("phoneSpeakerBtn");
   const speakerBtnLabel= document.getElementById("speakerBtnLabel");
+  const phoneCaptionEl = document.getElementById("phoneCaption");
   const toast          = document.getElementById("toast");
 
   // Landing → App
@@ -1153,6 +1166,7 @@
     callBtn.classList.remove("in-call");
     callBtn.innerHTML  = SVG.phoneStart;
     callBtnLabel.textContent = "Call";
+    phoneCaptionEl.textContent = "";
     setPhoneStatus("Call ended");
     setTimeout(() => {
       if (!callActive) setPhoneStatus("Tap call to connect");
@@ -1202,6 +1216,8 @@
         const raw = data.agentResponse;
         const callEnded = raw.includes("[END_CALL]") || raw.includes("[DISPATCH_CONFIRMED]");
         const cleaned = raw.replace(/\[END_CALL\]/g, "").replace(/\[DISPATCH_CONFIRMED\]/g, "").trim();
+
+        if (isVoice) phoneCaptionEl.textContent = cleaned;
 
         if (callEnded) {
           autoRestart = false;
@@ -1300,9 +1316,24 @@
       currentAudio = audio;
       audio.onended = () => { URL.revokeObjectURL(url); finish(); };
       audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
-      audio.play();
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.error("[TTS] audio.play() blocked:", err);
+          URL.revokeObjectURL(url);
+          currentAudio = null;
+          isSpeaking = false;
+          if ("speechSynthesis" in window) {
+            const u = new SpeechSynthesisUtterance(text);
+            u.onend = finish;
+            window.speechSynthesis.speak(u);
+          } else {
+            finish();
+          }
+        });
+      }
     } catch (err) {
-      console.error("TTS error:", err);
+      console.error("[TTS] fetch error:", err);
       isSpeaking = false;
       if ("speechSynthesis" in window) {
         const u = new SpeechSynthesisUtterance(text);
@@ -1352,19 +1383,49 @@
   callBtn.addEventListener("click", () => {
     if (!callActive) {
       callActive  = true;
-      autoRestart = true;
+      autoRestart = false;  // will be set true after greeting plays
       isMicMuted  = false;
       callBtn.classList.add("in-call");
       callBtn.innerHTML = SVG.phoneEnd;
       callBtnLabel.textContent = "End";
-      setPhoneStatus("Listening...", "listening");
+      setPhoneStatus("Connecting...", "");
       startCallTimer();
       finalBuffer = "";
-      try { recognition.start(); } catch(e) {}
+      greetCaller();
     } else {
       endCall();
     }
   });
+
+  async function greetCaller() {
+    try {
+      const res = await fetch("/process-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId, message: "[CALL_STARTED]" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const cleaned = data.agentResponse
+          .replace(/\[END_CALL\]/g, "").replace(/\[DISPATCH_CONFIRMED\]/g, "").trim();
+        phoneCaptionEl.textContent = cleaned;
+        setPhoneStatus("Speaking...", "speaking");
+        speak(cleaned, startListening);
+      } else {
+        startListening();
+      }
+    } catch {
+      startListening();
+    }
+  }
+
+  function startListening() {
+    if (!callActive || isMicMuted) return;
+    autoRestart = true;
+    finalBuffer = "";
+    setPhoneStatus("Listening...", "listening");
+    try { recognition.start(); } catch(e) {}
+  }
 
   // Speech recognition
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1395,12 +1456,16 @@
 
     recognition.onresult = e => {
       let interim = "";
-      for (const r of e.results) {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
         if (r.isFinal) finalBuffer += r[0].transcript + " ";
         else interim += r[0].transcript;
       }
       if (activeMode !== "voice") {
         textInput.value = finalBuffer + interim;
+      } else {
+        const display = (finalBuffer + interim).trim();
+        if (display) phoneCaptionEl.textContent = display;
       }
       if (finalBuffer) {
         clearTimeout(sendTimer);
@@ -1419,7 +1484,11 @@
       }
       const transcript = (finalBuffer || (activeMode !== "voice" ? textInput.value : "")).trim();
       finalBuffer = "";
-      if (transcript) sendMessage(transcript);
+      if (transcript) {
+        sendMessage(transcript);
+      } else if (activeMode === "voice" && callActive) {
+        maybeAutoRestart();
+      }
     };
 
     recognition.onerror = e => {
