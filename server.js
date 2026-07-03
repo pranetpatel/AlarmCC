@@ -23,6 +23,10 @@ dotenv.config();
 // speech-input webhooks arriving after hangup are handled gracefully.
 const completedCallUUIDs = new Set();
 
+// ─── Post-call report dedup (in-memory) ──────────────────────────────────────
+// Prevents sending duplicate post-call reports if the completed event fires twice.
+const reportedCallUUIDs = new Set();
+
 // ─── Async filler pattern ─────────────────────────────────────────────────────
 // Stores pending AI promises keyed by call UUID. speech-input starts the AI,
 // returns a filler NCCO immediately, then ai-ready awaits the result.
@@ -372,6 +376,21 @@ Do NOT generate JSON on phone calls.`;
 // Minimum user turns before the agent is allowed to end a phone call.
 const MIN_PHONE_TURNS_BEFORE_END = 3;
 
+const POST_CALL_PROMPT = `You analyze fire alarm support call transcripts and return a post-call incident report.
+Return ONLY valid JSON:
+{
+  "outcome": "resolved | dispatched | unresolved | dropped",
+  "panel": { "brand": "", "model": "", "error_code": "" },
+  "root_cause": "",
+  "risk_level": "none | low | medium | high | life_safety",
+  "steps_tried": [{ "step": "", "result": "" }],
+  "call_summary": "",
+  "dispatch_type": "immediate | scheduled | none",
+  "site_address": "",
+  "appointment_time": ""
+}
+Rules: "dropped" = transcript ends without resolution or goodbye. "life_safety" = monitoring down, active alarm, or no power. "call_summary" = 1-2 plain English sentences describing what happened.`;
+
 const EXTRACTION_PROMPT = `You extract structured dispatch data from fire alarm support call transcripts.
 Return ONLY valid JSON matching this schema (use null or empty strings for unknown fields):
 {
@@ -487,6 +506,77 @@ async function sendContractorDispatchEmail(customerId, { force = false } = {}) {
   await db.setContractorEmailSent(customerId);
   console.log(`[Email] Contractor dispatch sent for ${customerId} → ${to}`);
   return result;
+}
+
+/** Extract lightweight post-call report from transcript. */
+async function extractCallReport(customerId) {
+  const history = await db.getFullHistory(customerId);
+  const msgs = (history?.messages || []).filter((m) => m.role !== "system");
+  if (msgs.length < 2) return null; // nothing meaningful happened
+
+  const transcript = msgs
+    .map((m) => `${m.role === "user" ? "Customer" : "Agent"}: ${m.content}`)
+    .join("\n");
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 600,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: POST_CALL_PROMPT },
+        { role: "user", content: transcript },
+      ],
+    });
+    return JSON.parse(response.choices[0].message.content);
+  } catch (err) {
+    console.error("[Report] Extraction failed:", err.message);
+    return {
+      outcome: "unresolved",
+      panel: { brand: "", model: "", error_code: "" },
+      root_cause: "Extraction failed — review transcript",
+      risk_level: "low",
+      steps_tried: [],
+      call_summary: `Call ended for ${customerId}. Manual review required.`,
+      dispatch_type: "none",
+      site_address: "",
+      appointment_time: "",
+    };
+  }
+}
+
+/** Send post-call incident report email. Deduped per call UUID via reportedCallUUIDs. */
+async function sendPostCallReportEmail(callUUID) {
+  if (reportedCallUUIDs.has(callUUID)) {
+    console.log(`[Report] Already sent for ${callUUID}`);
+    return;
+  }
+  reportedCallUUIDs.add(callUUID);
+
+  const to = process.env.CONTRACTOR_TEST_EMAIL;
+  if (!to || to.includes("your-account-email") || to.includes("example.com")) {
+    console.warn("[Report] CONTRACTOR_TEST_EMAIL not configured — skipping post-call report");
+    return;
+  }
+
+  const customerId = `phone-${callUUID}`;
+  const report = await extractCallReport(customerId);
+  if (!report) {
+    console.log(`[Report] No meaningful transcript for ${callUUID} — skipping`);
+    return;
+  }
+
+  const call = await db.getCall(callUUID);
+  const meta = {
+    customerId,
+    callerPhone: call?.phoneNumber || "Unknown",
+    duration: call?.duration || 0,
+    timestamp: new Date().toISOString(),
+  };
+
+  const template = templates.postCallReport(report, meta);
+  await sendEmail({ to, ...template });
+  console.log(`[Report] Post-call report sent for ${callUUID} → ${to}`);
 }
 
 /**
@@ -949,13 +1039,23 @@ app.post("/phone/event", async (req, res) => {
   console.log(`[Phone] 📋 Event — UUID: ${uuid} | status: ${status}${durStr}`);
 
   if (uuid && status) {
-    if (status === "completed") completedCallUUIDs.add(uuid);
+    if (status === "completed") {
+      completedCallUUIDs.add(uuid);
 
-    const update = { callId: uuid, status };
-    if (duration != null) update.duration = parseInt(duration, 10);
+      const update = { callId: uuid, status };
+      if (duration != null) update.duration = parseInt(duration, 10);
+      await db.upsertCall(update)
+        .catch((e) => console.error("[Phone] Failed to log event:", e.message));
 
-    await db.upsertCall(update)
-      .catch((e) => console.error("[Phone] Failed to log event:", e.message));
+      // Fire post-call report after DB is updated so duration is available
+      sendPostCallReportEmail(uuid)
+        .catch((e) => console.error("[Report] Post-call report failed:", e.message));
+    } else {
+      const update = { callId: uuid, status };
+      if (duration != null) update.duration = parseInt(duration, 10);
+      await db.upsertCall(update)
+        .catch((e) => console.error("[Phone] Failed to log event:", e.message));
+    }
   }
 
   res.status(200).json({ ok: true });

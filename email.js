@@ -264,6 +264,92 @@ function confirmationTemplate(conversation) {
 }
 
 /**
+ * templates.postCallReport(report, meta)
+ * Post-call incident report — sent when a phone call ends (any outcome).
+ * @param {object} report — extracted call report JSON
+ * @param {{ customerId: string, callerPhone?: string, duration?: number, timestamp?: string }} meta
+ */
+function postCallReportTemplate(report = {}, meta = {}) {
+  const outcome  = (report.outcome || "unknown").toLowerCase();
+  const panel    = report.panel || {};
+  const risk     = (report.risk_level || "low").toLowerCase();
+  const steps    = Array.isArray(report.steps_tried) ? report.steps_tried : [];
+  const duration = meta.duration ? `${Math.round(meta.duration / 60)}m ${meta.duration % 60}s` : "Unknown";
+
+  const OUTCOME_COLORS = {
+    resolved:   { bg: "#1b5e20", label: "Resolved" },
+    dispatched: { bg: "#bf360c", label: "Dispatched" },
+    unresolved: { bg: "#4a148c", label: "Unresolved" },
+    dropped:    { bg: "#37474f", label: "Dropped" },
+  };
+  const RISK_LABELS = {
+    none: "None", low: "Low", medium: "Medium", high: "HIGH", life_safety: "⚠ LIFE SAFETY",
+  };
+  const oc = OUTCOME_COLORS[outcome] || { bg: "#37474f", label: outcome };
+
+  const stepsHtml = steps.length
+    ? `<table style="width:100%;border-collapse:collapse;font-size:14px">
+        <tr style="background:#f5f5f5">
+          <th style="padding:8px 12px;text-align:left;color:#555;font-weight:600;width:60%">Step</th>
+          <th style="padding:8px 12px;text-align:left;color:#555;font-weight:600">Result</th>
+        </tr>
+        ${steps.map((s, i) => `
+        <tr style="background:${i % 2 ? "#fafafa" : "#fff"}">
+          <td style="padding:8px 12px;border-top:1px solid #eee">${escHtml(s.step || "")}</td>
+          <td style="padding:8px 12px;border-top:1px solid #eee;color:${s.result?.toLowerCase().includes("fail") ? "#c62828" : "#2e7d32"}">${escHtml(s.result || "—")}</td>
+        </tr>`).join("")}
+      </table>`
+    : '<p style="font-size:14px;color:#999;margin:0">No steps attempted</p>';
+
+  const subject = `Post-Call Report — ${oc.label} — ${panel.brand || "Unknown Panel"} ${panel.error_code ? `(${panel.error_code})` : ""}`.trim();
+
+  const html = `
+    <div style="${BASE_STYLE}">
+      <div style="${CARD_STYLE}">
+        <div style="background:${oc.bg};color:#fff;padding:28px 32px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;opacity:.8;margin-bottom:4px">POST-CALL INCIDENT REPORT</div>
+          <div style="font-size:24px;font-weight:700">${oc.label}</div>
+          <div style="margin-top:6px;font-size:14px;opacity:.85">${escHtml(report.call_summary || "")}</div>
+        </div>
+        <div style="${BODY_STYLE}">
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            ${row("Call ID", meta.customerId)}
+            ${row("Caller", meta.callerPhone || "Unknown")}
+            ${row("Duration", duration)}
+            ${row("Time", new Date(meta.timestamp || Date.now()).toLocaleString())}
+            ${row("Risk Level", badge(RISK_LABELS[risk] || risk, risk === "life_safety" || risk === "high" ? "critical" : risk === "medium" ? "medium" : "low"))}
+          </table>
+
+          <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#111">Panel</div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:24px">
+            ${row("Brand", panel.brand)}
+            ${row("Model", panel.model)}
+            ${row("Error Code", panel.error_code)}
+            ${row("Root Cause", report.root_cause)}
+          </table>
+
+          <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#111">Troubleshooting Steps</div>
+          <div style="margin-bottom:24px">${stepsHtml}</div>
+
+          ${outcome === "dispatched" ? `
+          <div style="background:#fff3e0;border-radius:8px;padding:16px;margin-top:4px">
+            <div style="font-size:12px;font-weight:700;color:#e65100;margin-bottom:6px">DISPATCH</div>
+            <table style="width:100%;border-collapse:collapse">
+              ${row("Type", report.dispatch_type)}
+              ${row("Site", report.site_address)}
+              ${row("Appointment", report.appointment_time)}
+            </table>
+            <p style="font-size:13px;color:#777;margin:8px 0 0">Full contractor brief sent separately.</p>
+          </div>` : ""}
+        </div>
+        <div style="${FOOTER_STYLE}">AlarmCC — Post-Call Report &nbsp;|&nbsp; ${escHtml(meta.customerId || "")}</div>
+      </div>
+    </div>`;
+
+  return { subject, html };
+}
+
+/**
  * templates.contractorDispatch(brief, meta)
  * On-call contractor dispatch brief — sent when dispatch is confirmed.
  * @param {object} brief — extracted dispatch JSON
@@ -380,5 +466,6 @@ module.exports = {
     escalationAlert: escalationAlertTemplate,
     confirmation: confirmationTemplate,
     contractorDispatch: contractorDispatchTemplate,
+    postCallReport: postCallReportTemplate,
   },
 };
